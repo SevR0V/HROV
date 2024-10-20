@@ -6,7 +6,7 @@ import ms5837
 import numpy as np
 from enum import IntEnum
 from SPIContainer import SPI_Xfer_Container
-from HROVcontrolsystem import YFrameControlSystem
+from HROVcontrolsystem import HROVControlSystem
 from asynctimer import AsyncTimer
 from utils import map_value
 
@@ -45,33 +45,10 @@ class UDPRxValues(IntEnum):
     YAW_KD = 19
     DEPTH_KP = 20
     DEPTH_KI = 21
-    DEPTH_KD = 22
-
-def thrustersDirCalibrate(thrusters: list, inv: list):
-    if not (len(thrusters) == len(inv)):
-        return None
-    thrstrsC= [0.0] * len(thrusters)
-    for i in range(len(thrusters)):
-        thrstrsC[i] = thrusters[i] * inv[i]
-    return thrstrsC
-
-def thrustersReorder(thrusters, order):
-    if not (len(thrusters) == len(order)):
-        return None
-    reThrusters = [0.0] * len(thrusters)
-    for i in range(len(thrusters)):
-        reThrusters[i] = thrusters[order[i]]
-    return reThrusters
-
-def thrustersReMap(thrusters, valueRange):
-    reThrusters = [0.0] * len(thrusters)
-    for i in range(len(thrusters)):
-        reThrusters[i] = map_value(thrusters[i], -100, 100, valueRange[0], valueRange[1])
-    return reThrusters
-        
+    DEPTH_KD = 22        
 
 class RemoteUdpDataServer(asyncio.Protocol):
-    def __init__(self, contolSystem: YFrameControlSystem, timer: AsyncTimer, bridge: SPI_Xfer_Container, thrustersDirCorr, thrustersOrder, trustersXValues):
+    def __init__(self, contolSystem: HROVControlSystem, timer: AsyncTimer, bridge: SPI_Xfer_Container):
         self.timer = timer
         self.bridge = bridge
         self.remoteAddres = None
@@ -93,10 +70,8 @@ class RemoteUdpDataServer(asyncio.Protocol):
         self.IMUErrors = [0.0, 0.0, 0.0]
         self.incrementScale = 0.5
         self.batCharge = 0
-        self.thrustersDirCorr = thrustersDirCorr
+
         self.ERRORFLAGS = np.uint64(0)
-        self.thrustersOrder = thrustersOrder
-        self.trustersXValues = trustersXValues
         
         self.newRxPacket = False
         self.newTxPacket = False
@@ -223,10 +198,8 @@ class RemoteUdpDataServer(asyncio.Protocol):
                                   self.controlSystem.getAxisValue(self.controlSystem.ControlAxes.YAW)]
                        
         self.controlSystem.setdt(self.timer.getInterval())
-        self.controlSystem.updateControl()
 
-    def dataCalculationTransfer(self):        
-        self.controlSystem.updateControl()
+    def dataCalculationTransfer(self):
         if self.ds_init:
             if self.depth_sensor.read(ms5837.OSR_256):
                 self.depth = self.depth_sensor.pressure(ms5837.UNITS_atm)*10-10
@@ -234,18 +207,7 @@ class RemoteUdpDataServer(asyncio.Protocol):
             self.bridge.set_cam_angle_value(self.cameraAngle)
             lightsValues = [50*self.lightState, 50*self.lightState]
             self.bridge.set_lights_values(lightsValues)
-            
-            calibratedThrust = thrustersDirCalibrate(self.controlSystem.getMotsControls(), self.thrustersDirCorr)
-            if calibratedThrust is None:
-                calibratedThrust = self.controlSystem.getMotsControls()
-                print("Thrusters calibration failure")
-            reOrderedCThrust = thrustersReorder(calibratedThrust, self.thrustersOrder)
-            if reOrderedCThrust is None:
-                reOrderedCThrust = calibratedThrust
-                print("Thrusters reordering failure")
-            reMappedRoCThrust = thrustersReMap(reOrderedCThrust, self.trustersXValues)
-            
-            self.bridge.set_mots_values(reMappedRoCThrust)
+            self.bridge.set_mots_values(self.controlSystem.getMotsControls())
             self.bridge.set_cam_angle_value(self.cameraAngle)     
         try:
             # Transfer data over SPI
