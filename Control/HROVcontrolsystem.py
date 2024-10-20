@@ -38,7 +38,7 @@ class HROVControlSystem:
         YAW         = 5
 
     class Thrusters(IntEnum):
-        # Y-frame specific
+        # HROV specific
         H_FORW_TOP      = 0
         H_FORW_BOT      = 1
         H_SIDE_FRONT    = 2

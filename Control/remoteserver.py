@@ -9,6 +9,7 @@ from SPIContainer import SPI_Xfer_Container
 from HROVcontrolsystem import HROVControlSystem
 from asynctimer import AsyncTimer
 from utils import map_value
+import random
 
 to_rad = math.pi / 180
 
@@ -70,6 +71,8 @@ class RemoteUdpDataServer(asyncio.Protocol):
         self.IMUErrors = [0.0, 0.0, 0.0]
         self.incrementScale = 0.5
         self.batCharge = 0
+        random.seed(2)
+    
 
         self.ERRORFLAGS = np.uint64(0)
         
@@ -218,31 +221,37 @@ class RemoteUdpDataServer(asyncio.Protocol):
         if eulers is not None:
             self.eulers = eulers 
         else:
+            self.eulers = [random.random(), random.random(), random.random()]
             print("Gyro data read error")           
         voltage = self.bridge.get_voltage()
         if voltage is not None:
             self.voltage = voltage
         else:
+            self.voltage = random.random()
             print("Voltage read error") 
         currAll = self.bridge.get_current_all()
         if currAll is not None:
             self.curAll = currAll
         else:
+            self.curAll = random.random()
             print("Current read error") 
         curLights = self.bridge.get_current_lights()
         if curLights is not None:
             self.curLights = curLights
         else:
+            self.curLights = [random.random(), random.random()]
             print("Lights current read error")
         acc = self.bridge.get_IMU_accelerometer()
         if acc is not None:
             self.accelerations = acc
         else:
+            self.accelerations = [random.random(), random.random(), random.random()]
             print("Accelerations read error")
         mag = self.bridge.get_IMU_magnetometer()
         if mag is not None:
             self.eulerMag = mag
         else:
+            self.eulerMag = [random.random(), random.random(), random.random()]
             print("Magnetometer date read error")
         self.controlSystem.setAxesValues([0, 0, 
                                           self.depth, 
