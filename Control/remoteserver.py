@@ -62,6 +62,7 @@ class RemoteUdpDataServer(asyncio.Protocol):
         self.lightState = 0
         self.eulers = [0.0, 0.0, 0.0]
         self.accelerations = [0.0, 0.0, 0.0]
+        self.IMURaw = [0.0, 0.0, 0.0]
         self.eulerMag = [0.0, 0.0, 0.0]
         self.voltage = 0
         self.curAll = 0
@@ -220,39 +221,42 @@ class RemoteUdpDataServer(asyncio.Protocol):
         eulers = self.bridge.get_IMU_angles()
         if eulers is not None:
             self.eulers = eulers 
-        else:
-            self.eulers = [random.random(), random.random(), random.random()]
-            print("Gyro data read error")           
+        # else:
+        #     self.eulers = [random.random(), random.random(), random.random()]
+        #     print("Gyro data read error")           
         voltage = self.bridge.get_voltage()
         if voltage is not None:
             self.voltage = voltage
-        else:
-            self.voltage = random.random()
-            print("Voltage read error") 
+        # else:
+        #     self.voltage = random.random()
+        #     print("Voltage read error") 
         currAll = self.bridge.get_current_all()
         if currAll is not None:
             self.curAll = currAll
-        else:
-            self.curAll = random.random()
-            print("Current read error") 
+        # else:
+        #     self.curAll = random.random()
+        #     print("Current read error") 
         curLights = self.bridge.get_current_lights()
         if curLights is not None:
             self.curLights = curLights
-        else:
-            self.curLights = [random.random(), random.random()]
-            print("Lights current read error")
+        # else:
+        #     self.curLights = [random.random(), random.random()]
+        #     print("Lights current read error")
         acc = self.bridge.get_IMU_accelerometer()
         if acc is not None:
             self.accelerations = acc
-        else:
-            self.accelerations = [random.random(), random.random(), random.random()]
-            print("Accelerations read error")
+        # else:
+        #     self.accelerations = [random.random(), random.random(), random.random()]
+        #     print("Accelerations read error")
         mag = self.bridge.get_IMU_magnetometer()
+        imuRaw = self.bridge.get_IMU_raw()
+        if imuRaw is not None:
+            self.IMURaw = imuRaw
         if mag is not None:
             self.eulerMag = mag
-        else:
-            self.eulerMag = [random.random(), random.random(), random.random()]
-            print("Magnetometer date read error")
+        # else:
+        #     self.eulerMag = [random.random(), random.random(), random.random()]
+        #     print("Magnetometer date read error")
         self.controlSystem.setAxesValues([0, 0, 
                                           self.depth, 
                                           self.eulers[0] - self.IMUErrors[0], 

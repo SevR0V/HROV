@@ -5,18 +5,19 @@ from enum import IntEnum
 
 # TX_BUFFER: [ MAGIC_START | MOT_SERVO | MAN_Q | ... | MAGIC_END ]
 # TX bytes: [MAGIC_START (1x1)(1) | FLAGS (8x1)(8) | LIGHT (2x4)(8) | MOTORS (6x4)(24) | CAM_ANGLE (1x4)(4) | ... | MAGIC_END (1x1)(1) ]
-# RX bytes: [MAGIC_START (1x1)(1) | FLAGS (8x1)(8) | EULER (3x4)(12) | EULER_ACC (3x4)(12) | EULER_MAG (3x4)(12) | CUR_ALL (2x4)(4) | CUR_LIGHT1 (1x4)(4) | CUR_LIGHT2 (1x4)(4) | VOLTS24 (1x4)(4) | ... | MAGIC_END (1x1)(1) ]
+# RX bytes: [MAGIC_START (1x1)(1) | FLAGS (8x1)(8) | EULER (3x4)(12) | EULER_ACC (3x4)(12) | EULER_RAW (3x4)(12) | EULER_MAG (3x4)(12) | CUR_ALL (2x4)(4) | CUR_LIGHT1 (1x4)(4) | CUR_LIGHT2 (1x4)(4) | VOLTS24 (1x4)(4) | ... | MAGIC_END (1x1)(1) ]
 
 class RxBufferOffsets(IntEnum):
     MAGIC_START = 0
     FLAGS = 1
     EULER = 9
     EULER_ACC = 21
-    EULER_MAG = 33
-    CUR_ALL = 45
-    CUR_LIGHT1 = 49
-    CUR_LIGHT2 = 53
-    VOLTS24 = 57
+    EULER_RAW = 33
+    EULER_MAG = 45
+    CUR_ALL = 57
+    CUR_LIGHT1 = 61
+    CUR_LIGHT2 = 65
+    VOLTS24 = 69
     MAGIC_END = 199
 
 class TxBufferOffsets(IntEnum):
@@ -30,17 +31,18 @@ class TxBufferOffsets(IntEnum):
 
 SPI_RX_EULERx_FLAG = np.uint64(1 << 0)
 SPI_RX_EULER_ACCx_FLAG = np.uint64(1 << 1)
-SPI_RX_EULER_MAGx_FLAG = np.uint64(1 << 2)
-SPI_RX_CUR_ALLx_FLAG = np.uint64(1 << 3)
-SPI_RX_CUR_LIGHT1x_FLAG = np.uint64(1 << 4)
-SPI_RX_CUR_LIGHT2x_FLAG = np.uint64(1 << 5)
-SPI_RX_VOLTS24x_FLAG = np.uint64(1 << 6)
+SPI_RX_EULER_RAWx_FLAG = np.uint64(1 << 2)
+SPI_RX_EULER_MAGx_FLAG = np.uint64(1 << 3)
+SPI_RX_CUR_ALLx_FLAG = np.uint64(1 << 4)
+SPI_RX_CUR_LIGHT1x_FLAG = np.uint64(1 << 5)
+SPI_RX_CUR_LIGHT2x_FLAG = np.uint64(1 << 6)
+SPI_RX_VOLTS24x_FLAG = np.uint64(1 << 7)
 
 SPI_TX_DES_MOTORSx_FLAG = np.uint64(1 << 0)
 SPI_TX_DES_LIGHTx_FLAG = np.uint64(1 << 1)
 SPI_TX_DES_CAM_ANGLEx_FLAG = np.uint64(1 << 2)
 
-baseRxPacket = "Qfffffffffffff"
+baseRxPacket = "Qffffffffffffffff"
 
 def countPacketfSize(packetf):
     packetSize = 0
@@ -81,6 +83,7 @@ class SPI_Xfer_Container:
         # RX
         self.euler = [0.0, 0.0, 0.0]
         self.eulerAcc = [0.0, 0.0, 0.0]
+        self.eulerRaw = [0.0, 0.0, 0.0]
         self.eulerMag = [0.0, 0.0, 0.0]
         self.currentAll = 0
         self.cirrentLight1 = 0
@@ -103,11 +106,12 @@ class SPI_Xfer_Container:
         self.rx_refresh_flags = np.uint64(rxPacket[1])
         self.euler = [rxPacket[2], rxPacket[3], rxPacket[4]] if self.rx_refresh_flags & SPI_RX_EULERx_FLAG else None
         self.eulerAcc = [rxPacket[5], rxPacket[6], rxPacket[7]] if self.rx_refresh_flags & SPI_RX_EULER_ACCx_FLAG else None
-        self.eulerMag = [rxPacket[8], rxPacket[9], rxPacket[10]] if self.rx_refresh_flags & SPI_RX_EULER_MAGx_FLAG else None
-        self.currentAll = rxPacket[11] if self.rx_refresh_flags & SPI_RX_CUR_ALLx_FLAG else None
-        self.cirrentLight1 = rxPacket[12] if self.rx_refresh_flags & SPI_RX_CUR_LIGHT1x_FLAG else None
-        self.cirrentLight2 = rxPacket[13] if self.rx_refresh_flags & SPI_RX_CUR_LIGHT2x_FLAG else None
-        self.voltage24 = rxPacket[14] if self.rx_refresh_flags & SPI_RX_VOLTS24x_FLAG else None
+        self.eulerRaw = [rxPacket[8], rxPacket[9], rxPacket[10]] if self.rx_refresh_flags & SPI_RX_EULER_RAWx_FLAG else None
+        self.eulerMag = [rxPacket[11], rxPacket[12], rxPacket[13]] if self.rx_refresh_flags & SPI_RX_EULER_MAGx_FLAG else None
+        self.currentAll = rxPacket[14] if self.rx_refresh_flags & SPI_RX_CUR_ALLx_FLAG else None
+        self.cirrentLight1 = rxPacket[15] if self.rx_refresh_flags & SPI_RX_CUR_LIGHT1x_FLAG else None
+        self.cirrentLight2 = rxPacket[16] if self.rx_refresh_flags & SPI_RX_CUR_LIGHT2x_FLAG else None
+        self.voltage24 = rxPacket[17] if self.rx_refresh_flags & SPI_RX_VOLTS24x_FLAG else None
         return True
 
     def _fill_tx_buffer(self):
@@ -154,6 +158,12 @@ class SPI_Xfer_Container:
         if self.rx_refresh_flags & SPI_RX_EULERx_FLAG:
             self.rx_refresh_flags &= ~(SPI_RX_EULERx_FLAG)
             return self.euler
+        return None
+    
+    def get_IMU_raw(self):
+        if self.rx_refresh_flags & SPI_RX_EULER_RAWx_FLAG:
+            self.rx_refresh_flags &= ~(SPI_RX_EULER_RAWx_FLAG)
+            return self.eulerRaw
         return None
     
     def get_IMU_accelerometer(self):
