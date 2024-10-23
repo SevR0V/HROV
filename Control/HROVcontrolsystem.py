@@ -96,11 +96,15 @@ class HROVControlSystem:
         self.__thrustersCalibrate()
 
         for i in range(6):
-            inc = self.__thrusterIncrement if self.__motsOutputsReal[i] > 0 else 0-self.__thrusterIncrement
+            inc = self.__thrusterIncrement if self.__motsOutputsSetpoint[i] > 0 else 0-self.__thrusterIncrement
             self.__motsOutputsReal[i] += inc if abs(self.__motsOutputsReal[i]) < abs(self.__motsOutputsSetpoint[i]) else 0
             self.__motsOutputsReal[i] -= inc if abs(self.__motsOutputsReal[i]) > abs(self.__motsOutputsSetpoint[i]) else 0
+            if (self.__motsOutputsSetpoint[i] > 0 and self.__motsOutputsReal[i] < 0) or (self.__motsOutputsSetpoint[i] < 0 and self.__motsOutputsReal[i] > 0):
+                self.__motsOutputsReal[i] = 0
             if self.__motsOutputsSetpoint[i] == 0:
                 self.__motsOutputsReal[i] = 0
+            if abs(abs(self.__motsOutputsReal[i]) - abs(self.__motsOutputsSetpoint[i])) < self.__thrusterIncrement:
+                self.__motsOutputsReal[i] = self.__motsOutputsSetpoint[i]
     
     # Setters
     def setPIDConstants(self, controlAxis: ControlAxes, constants):
