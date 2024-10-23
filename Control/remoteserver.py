@@ -113,7 +113,7 @@ class RemoteUdpDataServer(asyncio.Protocol):
             
             self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.STRAFE, (received[0] ** 3) * 100 * self.powerTarget)
             self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.FORWARD, (received[1]  ** 3) * 100 * self.powerTarget)
-            self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.DEPTH, (received[2] ** 3) * 100) * self.powerTarget
+            self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.DEPTH, (received[2] ** 3) * 100 * self.powerTarget)
             self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.YAW, (received[4] ** 3) * 100 * self.powerTarget) 
 
             self.cameraRotate = received[7]
@@ -267,7 +267,6 @@ class RemoteUdpDataServer(asyncio.Protocol):
                                           self.eulers[0] - self.IMUErrors[0], 
                                           self.eulers[1] - self.IMUErrors[1], 
                                           self.eulers[2] - self.IMUErrors[2]])
-        print(self.controlSystem.getMotsControls())
         if self.remoteAddres:
             if not self.newTxPacket:
                 telemetry_data = struct.pack('=fffffff', self.controlSystem.getAxisValue(self.controlSystem.ControlAxes.ROLL), 
