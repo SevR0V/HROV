@@ -4,10 +4,11 @@ from utils import constrain, PID, ExpMovingAverageFilter, map_value
 
 
 class HROVControlSystem:
-    def __init__(self, thrustersDirCorr, thrustersOrder, trustersXValues):
+    def __init__(self, thrustersDirCorr, thrustersOrder, trustersXValues, thrusterIncrement):
         self.thrustersDirCorr = thrustersDirCorr
         self.thrustersOrder = thrustersOrder
         self.trustersXValues = trustersXValues
+        self.thrusterIncrement = thrusterIncrement
         # (forward,strafe,depth,roll,pitch,yaw)
         self.__axesInputs     = [0, 0, 0, 0, 0, 0]
         self.__axesValues     = [0, 0, 0, 0, 0, 0]        
@@ -26,7 +27,8 @@ class HROVControlSystem:
                           None, 
                           None]
         # (hor1,hor2,hor3,ver1,ver2,ver3)
-        self.__motsOutputs = [0, 0, 0, 0, 0, 0]
+        self.__motsOutputsSetpoint = [0, 0, 0, 0, 0, 0]
+        self.__motsOutputsReal = [0, 0, 0, 0, 0, 0]
         self.__dt = 1/500
 
     class ControlAxes(IntEnum):
@@ -64,27 +66,37 @@ class HROVControlSystem:
         self.__PIDValues[self.ControlAxes.DEPTH] = constrain(depthPID, -100, 100)
 
     def __calculateThrust(self):
-        self.__motsOutputs[self.Thrusters.H_FORW_TOP] = constrain(self.__axesInputs[self.ControlAxes.FORWARD] - self.__PIDValues[self.ControlAxes.PITCH], -100, 100)
-        self.__motsOutputs[self.Thrusters.H_FORW_BOT] = constrain(self.__axesInputs[self.ControlAxes.FORWARD] + self.__PIDValues[self.ControlAxes.PITCH], -100, 100)
-        self.__motsOutputs[self.Thrusters.H_SIDE_FRONT] = constrain(self.__axesInputs[self.ControlAxes.STRAFE] + self.__axesInputs[self.ControlAxes.YAW] + self.__PIDValues[self.ControlAxes.YAW], -100, 100)
-        self.__motsOutputs[self.Thrusters.H_SIDE_REAR] = constrain(self.__axesInputs[self.ControlAxes.STRAFE] - self.__axesInputs[self.ControlAxes.YAW] - self.__PIDValues[self.ControlAxes.YAW], -100, 100)
-        self.__motsOutputs[self.Thrusters.V_RIGHT] = constrain(self.__axesInputs[self.ControlAxes.DEPTH] - self.__PIDValues[self.ControlAxes.ROLL], -100, 100)
-        self.__motsOutputs[self.Thrusters.V_LEFT] = constrain(self.__axesInputs[self.ControlAxes.DEPTH] + self.__PIDValues[self.ControlAxes.ROLL], -100, 100)
+        self.__motsOutputsSetpoint[self.Thrusters.H_FORW_TOP] = constrain(self.__axesInputs[self.ControlAxes.FORWARD] - self.__PIDValues[self.ControlAxes.PITCH], -100, 100)
+        self.__motsOutputsSetpoint[self.Thrusters.H_FORW_BOT] = constrain(self.__axesInputs[self.ControlAxes.FORWARD] + self.__PIDValues[self.ControlAxes.PITCH], -100, 100)
+        self.__motsOutputsSetpoint[self.Thrusters.H_SIDE_FRONT] = constrain(self.__axesInputs[self.ControlAxes.STRAFE] + self.__axesInputs[self.ControlAxes.YAW] + self.__PIDValues[self.ControlAxes.YAW], -100, 100)
+        self.__motsOutputsSetpoint[self.Thrusters.H_SIDE_REAR] = constrain(self.__axesInputs[self.ControlAxes.STRAFE] - self.__axesInputs[self.ControlAxes.YAW] - self.__PIDValues[self.ControlAxes.YAW], -100, 100)
+        self.__motsOutputsSetpoint[self.Thrusters.V_RIGHT] = constrain(self.__axesInputs[self.ControlAxes.DEPTH] - self.__PIDValues[self.ControlAxes.ROLL], -100, 100)
+        self.__motsOutputsSetpoint[self.Thrusters.V_LEFT] = constrain(self.__axesInputs[self.ControlAxes.DEPTH] + self.__PIDValues[self.ControlAxes.ROLL], -100, 100)
 
     
     def __thrustersCalibrate(self):
-        if not (len(self.__motsOutputs) == len(self.thrustersDirCorr)) and not (len(self.__motsOutputs) == len(self.thrustersOrder)):
+        if not (len(self.__motsOutputsSetpoint) == len(self.thrustersDirCorr)) and not (len(self.__motsOutputsSetpoint) == len(self.thrustersOrder)):
             return None
-        reThrusters = [0.0] * len(self.__motsOutputs)
-        for i in range(len(self.__motsOutputs)):
-            reThrusters[i] = self.__motsOutputs[self.thrustersOrder[i]]
+        reThrusters = [0.0] * len(self.__motsOutputsSetpoint)
+        for i in range(len(self.__motsOutputsSetpoint)):
+            reThrusters[i] = self.__motsOutputsSetpoint[self.thrustersOrder[i]]
             reThrusters[i] = map_value(reThrusters[i], -100, 100, self.trustersXValues[0], self.trustersXValues[1]) * self.thrustersDirCorr[i]
-        self.__motsOutputs = reThrusters
+        self.__motsOutputsSetpoint = reThrusters
 
     def __updateControl(self):
         self.__updatePID()
         self.__calculateThrust()
         self.__thrustersCalibrate()
+        for i in range(6):
+            # if abs(self.__motsOutputsSetpoint[i]) - abs(self.__motsOutputsReal[i]) < 0:
+            #     self.__motsOutputsReal[i] -= self.thrusterIncrement if abs(self.__motsOutputsReal[i]) < abs(self.__motsOutputsSetpoint[i]) else 0
+            # elif abs(self.__motsOutputsSetpoint[i]) - abs(self.__motsOutputsReal[i]) > 0:
+            #     self.__motsOutputsReal[i] += self.thrusterIncrement if abs(self.__motsOutputsReal[i]) > abs(self.__motsOutputsSetpoint[i]) else 0
+            inc = self.thrusterIncrement if self.__motsOutputsReal[i] > 0 else 0-self.thrusterIncrement
+            self.__motsOutputsReal[i] += inc if abs(self.__motsOutputsReal[i]) < abs(self.__motsOutputsSetpoint[i]) else 0
+            self.__motsOutputsReal[i] -= inc if abs(self.__motsOutputsReal[i]) > abs(self.__motsOutputsSetpoint[i]) else 0
+            if self.__motsOutputsSetpoint[i] == 0 and abs(self.__motsOutputsReal[i]) < self.thrusterIncrement*2 :
+                self.__motsOutputsReal[i] = 0
     
     # Setters
     def setPIDConstants(self, controlAxis: ControlAxes, constants):
@@ -130,11 +142,11 @@ class HROVControlSystem:
 
     def getMotsControls(self):
         self.__updateControl()
-        return self.__motsOutputs
+        return self.__motsOutputsReal
 
     def getMotControl(self, controlAxis: ControlAxes):
         self.__updateControl()
-        return self.__motsOutputs[controlAxis]
+        return self.__motsOutputsReal[controlAxis]
     
     def getAxisValue(self, controlAxis: ControlAxes):
         return self.__axesValues[controlAxis]

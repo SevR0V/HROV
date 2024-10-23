@@ -109,10 +109,10 @@ class RemoteUdpDataServer(asyncio.Protocol):
             #fx, fy, vertical_thrust, powertarget, rotation_velocity, manipulator_grip, manipulator_rotate, camera_rotate, reset, light_state, stabilization, RollInc, PitchInc, ResetPosition.
             received = struct.unpack_from("=ffffffffBBBffBffffffffffffB", packet)
             
-            self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.STRAFE, received[0] * 100)
-            self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.FORWARD, received[1] * 100)
-            self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.DEPTH, received[2] * 100)
-            self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.YAW, received[4] * 100) 
+            self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.STRAFE, (received[0] ** 3) * 100)
+            self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.FORWARD, (received[1]  ** 3) * 100)
+            self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.DEPTH, (received[2] ** 3) * 100)
+            self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.YAW, (received[4] ** 3) * 100) 
 
             self.powerTarget = received[3]
             self.cameraRotate = received[7]
@@ -262,7 +262,7 @@ class RemoteUdpDataServer(asyncio.Protocol):
                                           self.eulers[0] - self.IMUErrors[0], 
                                           self.eulers[1] - self.IMUErrors[1], 
                                           self.eulers[2] - self.IMUErrors[2]])
-
+        print(self.controlSystem.getMotsControls())
         if self.remoteAddres:
             if not self.newTxPacket:
                 telemetry_data = struct.pack('=fffffff', self.controlSystem.getAxisValue(self.controlSystem.ControlAxes.ROLL), 

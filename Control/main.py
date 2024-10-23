@@ -17,17 +17,17 @@ SPISpeed = 500000
 SPIFlags = 0
 
 #init thrusters parameters
-thrustersDirCorr = [-1, -1, 1, 1, 1, -1]
+thrustersDirCorr = [1, 1, 1, 1, 1, 1]
 thrustersOrder = [HROVControlSystem.Thrusters.H_FORW_TOP, 
                   HROVControlSystem.Thrusters.H_FORW_BOT,
                   HROVControlSystem.Thrusters.H_SIDE_FRONT, 
                   HROVControlSystem.Thrusters.H_SIDE_REAR,
                   HROVControlSystem.Thrusters.V_RIGHT,
                   HROVControlSystem.Thrusters.V_LEFT]
-trustersXValues = [-100, 100]
+trustersXValues = [-500, 500]
 
 #init control system
-controlSystem = HROVControlSystem(thrustersDirCorr, thrustersOrder, trustersXValues)
+controlSystem = HROVControlSystem(thrustersDirCorr, thrustersOrder, trustersXValues, 0.5)
 
 #init timer parameters
 timerInterval = 1/500 #500 Hz timer interval
