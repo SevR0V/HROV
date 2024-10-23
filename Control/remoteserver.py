@@ -109,7 +109,7 @@ class RemoteUdpDataServer(asyncio.Protocol):
             #fx, fy, vertical_thrust, powertarget, rotation_velocity, manipulator_grip, manipulator_rotate, camera_rotate, reset, light_state, stabilization, RollInc, PitchInc, ResetPosition.
             received = struct.unpack_from("=ffffffffBBBffBffffffffffffB", packet)
 
-            self.powerTarget = received[3] * 0.7
+            self.powerTarget = received[3]
             
             self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.STRAFE, (received[0] ** 3) * 100 * self.powerTarget)
             self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.FORWARD, (received[1]  ** 3) * 100 * self.powerTarget)
@@ -168,7 +168,7 @@ class RemoteUdpDataServer(asyncio.Protocol):
             self.controlSystem.setStabilization(self.controlSystem.ControlAxes.YAW, yawStab)
             self.controlSystem.setStabilization(self.controlSystem.ControlAxes.DEPTH, depthStab)
 
-            self.powerTarget = received[UDPRxValues.POWER_TARGET] * 0.7 
+            self.powerTarget = received[UDPRxValues.POWER_TARGET]
             
             self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.FORWARD, received[UDPRxValues.FORWARD] * 100 * self.powerTarget)
             self.controlSystem.setAxisInput(self.controlSystem.ControlAxes.STRAFE, received[UDPRxValues.STRAFE] * 100 * self.powerTarget)
