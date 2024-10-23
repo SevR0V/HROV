@@ -27,7 +27,7 @@ thrustersOrder = [HROVControlSystem.Thrusters.H_FORW_TOP,
 trustersXValues = [-500, 500]
 
 #init control system
-controlSystem = HROVControlSystem(thrustersDirCorr)
+controlSystem = HROVControlSystem()
 controlSystem.set_thrusters_calibration_values(thrustersDirCorr, thrustersOrder, trustersXValues, 0.5)
 
 #init timer parameters
