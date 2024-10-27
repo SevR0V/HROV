@@ -54,8 +54,6 @@ class ControlSystem:
         # Operating period
         self.__dt = 1/500
 
-
-
     def __updatePID(self):
         if not ((np.abs(self.__axesInputs[Axes.DEPTH])<1) and self.__stabs[Axes.DEPTH]):
             self.setPIDSetpoint(Axes.DEPTH, self.__axesValues[Axes.DEPTH])
