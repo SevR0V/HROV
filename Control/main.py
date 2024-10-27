@@ -6,6 +6,7 @@ from remoteserver import ControlType
 from SPIContainer import SPI_Xfer_Container
 from asynctimer import AsyncTimer
 from HROVcontrolsystem import ControlSystem
+from HROVcontrolsystem import ThrustersNames
 from navx import Navx
 import serial_asyncio
 from thruster import Thrusters
@@ -36,12 +37,12 @@ cameraServo = None
 udp_server = None
 
 #init thrusters parameters
-thrustersOrder = [ControlSystem.Thrusters.H_FORW_TOP, 
-                  ControlSystem.Thrusters.H_FORW_BOT,
-                  ControlSystem.Thrusters.H_SIDE_FRONT, 
-                  ControlSystem.Thrusters.H_SIDE_REAR,
-                  ControlSystem.Thrusters.V_RIGHT,
-                  ControlSystem.Thrusters.V_LEFT]
+thrustersOrder = [ThrustersNames.H_FORW_TOP, 
+                  ThrustersNames.H_FORW_BOT,
+                  ThrustersNames.H_SIDE_FRONT, 
+                  ThrustersNames.H_SIDE_REAR,
+                  ThrustersNames.V_RIGHT,
+                  ThrustersNames.V_LEFT]
 thrustersDirCorr = [1, 1, 1, 1, 1, 1]
 trustersXValues = [-50, 50]
 
@@ -73,12 +74,12 @@ if controlType == ControlType.DIRECT_CTRL:
     #init thrusters
     thrustersPins = [0] * 6
 
-    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.H_FORW_TOP)]    = 10
-    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.H_FORW_BOT)]    = 9
-    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.H_SIDE_FRONT)]  = 17
-    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.H_SIDE_REAR)]   = 22
-    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.V_RIGHT)]       = 27
-    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.V_LEFT)]        = 11
+    thrustersPins[thrustersOrder.index(ThrustersNames.H_FORW_TOP)]    = 10
+    thrustersPins[thrustersOrder.index(ThrustersNames.H_FORW_BOT)]    = 9
+    thrustersPins[thrustersOrder.index(ThrustersNames.H_SIDE_FRONT)]  = 17
+    thrustersPins[thrustersOrder.index(ThrustersNames.H_SIDE_REAR)]   = 22
+    thrustersPins[thrustersOrder.index(ThrustersNames.V_RIGHT)]       = 27
+    thrustersPins[thrustersOrder.index(ThrustersNames.V_LEFT)]        = 11
 
     thrusters = Thrusters(pi, thrustersPins, [16], [[0, 0],[0, 0],[0, 0],[0, 0],[0, 0],[0, 0]], [[0, 0],[0, 0],[0, 0],[0, 0],[0, 0],[0, 0]])
 
