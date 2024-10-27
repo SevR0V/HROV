@@ -1,6 +1,5 @@
 import struct
 import numpy as np
-import time
 from enum import IntEnum
 
 # TX_BUFFER: [ MAGIC_START | MOT_SERVO | MAN_Q | ... | MAGIC_END ]
@@ -18,7 +17,7 @@ class RxBufferOffsets(IntEnum):
     CUR_LIGHT1 = 61
     CUR_LIGHT2 = 65
     VOLTS24 = 69
-    MAGIC_END = 199
+    MAGIC_END = 99
 
 class TxBufferOffsets(IntEnum):
     MAGIC_START = 0
@@ -26,21 +25,21 @@ class TxBufferOffsets(IntEnum):
     MOTORS = 9
     CAM_ANGLE = 33
     LIGHT = 37 
-    MAGIC_END = 199
+    MAGIC_END = 99
 
 
-SPI_RX_EULERx_FLAG = np.uint64(1 << 0)
-SPI_RX_EULER_ACCx_FLAG = np.uint64(1 << 1)
-SPI_RX_EULER_RAWx_FLAG = np.uint64(1 << 2)
-SPI_RX_EULER_MAGx_FLAG = np.uint64(1 << 3)
-SPI_RX_CUR_ALLx_FLAG = np.uint64(1 << 4)
-SPI_RX_CUR_LIGHT1x_FLAG = np.uint64(1 << 5)
-SPI_RX_CUR_LIGHT2x_FLAG = np.uint64(1 << 6)
-SPI_RX_VOLTS24x_FLAG = np.uint64(1 << 7)
+SPI_RX_EULERx_FLAG =        np.uint64(1 << 0)
+SPI_RX_EULER_ACCx_FLAG =    np.uint64(1 << 1)
+SPI_RX_EULER_RAWx_FLAG =    np.uint64(1 << 2)
+SPI_RX_EULER_MAGx_FLAG =    np.uint64(1 << 3)
+SPI_RX_CUR_ALLx_FLAG =      np.uint64(1 << 4)
+SPI_RX_CUR_LIGHT1x_FLAG =   np.uint64(1 << 5)
+SPI_RX_CUR_LIGHT2x_FLAG =   np.uint64(1 << 6)
+SPI_RX_VOLTS24x_FLAG =      np.uint64(1 << 7)
 
-SPI_TX_DES_MOTORSx_FLAG = np.uint64(1 << 0)
-SPI_TX_DES_LIGHTx_FLAG = np.uint64(1 << 1)
-SPI_TX_DES_CAM_ANGLEx_FLAG = np.uint64(1 << 2)
+SPI_TX_DES_MOTORSx_FLAG =       np.uint64(1 << 0)
+SPI_TX_DES_LIGHTx_FLAG =        np.uint64(1 << 1)
+SPI_TX_DES_CAM_ANGLEx_FLAG =    np.uint64(1 << 2)
 
 baseRxPacket = "Qffffffffffffffff"
 
@@ -55,7 +54,7 @@ def countPacketfSize(packetf):
 def formPacket(defPacket):
     packetSize = countPacketfSize(defPacket)    
     packetSize += 2
-    hollowSize = 200 - packetSize
+    hollowSize = 100 - packetSize
     resPacket = defPacket
     for i in range(hollowSize):
         resPacket += "B"
@@ -64,7 +63,7 @@ def formPacket(defPacket):
 
 
 class SPI_Xfer_Container:
-    BUFFER_SIZE = 200
+    BUFFER_SIZE = 100
     MAGIC_START = 0xAB
     MAGIC_END = 0xCD
 
@@ -81,7 +80,7 @@ class SPI_Xfer_Container:
         self.des_cam_angle = 0.0
 
         # RX
-        self.euler = [0.0, 0.0, 0.0]
+        self.euler =    [0.0, 0.0, 0.0]
         self.eulerAcc = [0.0, 0.0, 0.0]
         self.eulerRaw = [0.0, 0.0, 0.0]
         self.eulerMag = [0.0, 0.0, 0.0]
@@ -208,4 +207,3 @@ class SPI_Xfer_Container:
     def close(self):
         self.pi.spi_close(self.spi_handle)
         self.pi.stop()
-

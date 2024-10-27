@@ -3,16 +3,16 @@ import numpy as np
 from utils import constrain, PID, ExpMovingAverageFilter, map_value
 
 
-class HROVControlSystem:
+class ControlSystem:
     def __init__(self):
         # Thrusters calibration values
         self.__thrustersDirCorr = [1, 1, 1, 1, 1, 1]
-        self.__thrustersOrder = [HROVControlSystem.Thrusters.H_FORW_TOP, 
-                  HROVControlSystem.Thrusters.H_FORW_BOT,
-                  HROVControlSystem.Thrusters.H_SIDE_FRONT, 
-                  HROVControlSystem.Thrusters.H_SIDE_REAR,
-                  HROVControlSystem.Thrusters.V_RIGHT,
-                  HROVControlSystem.Thrusters.V_LEFT]
+        self.__thrustersOrder = [ControlSystem.Thrusters.H_FORW_TOP, 
+                  ControlSystem.Thrusters.H_FORW_BOT,
+                  ControlSystem.Thrusters.H_SIDE_FRONT, 
+                  ControlSystem.Thrusters.H_SIDE_REAR,
+                  ControlSystem.Thrusters.V_RIGHT,
+                  ControlSystem.Thrusters.V_LEFT]
         self.__trustersXValues = [-100, 100]
         self.__thrusterIncrement = 0.5
         # (forward,strafe,depth,roll,pitch,yaw)
@@ -84,9 +84,8 @@ class HROVControlSystem:
     def __thrustersCalibrate(self):
         if not (len(self.__motsOutputsSetpoint) == len(self.__thrustersDirCorr)) and not (len(self.__motsOutputsSetpoint) == len(self.__thrustersOrder)):
             return None
-        reThrusters = [0.0] * len(self.__motsOutputsSetpoint)
+        reThrusters = self.__motsOutputsSetpoint
         for i in range(len(self.__motsOutputsSetpoint)):
-            reThrusters[i] = self.__motsOutputsSetpoint[self.__thrustersOrder[i]]
             reThrusters[i] = map_value(reThrusters[i], -100, 100, self.__trustersXValues[0], self.__trustersXValues[1]) * self.__thrustersDirCorr[i]
         self.__motsOutputsSetpoint = reThrusters
 
@@ -142,7 +141,7 @@ class HROVControlSystem:
     def setdt(self, dt):
         self.__dt = dt
 
-    def set_thrusters_calibration_values(self, thrustersDirCorr, thrustersOrder, trustersXValues, thrusterIncrement):
+    def setThrustersCalibrationValues(self, thrustersDirCorr, thrustersOrder, trustersXValues, thrusterIncrement):
         self.__thrustersDirCorr = thrustersDirCorr
         self.__thrustersOrder = thrustersOrder
         self.__trustersXValues = trustersXValues
@@ -154,11 +153,11 @@ class HROVControlSystem:
             return self.__PIDs[controlAxis].setpoint
         return 0
 
-    def getMotsControls(self):
+    def getThrustersControls(self):
         self.__updateControl()
         return self.__motsOutputsReal
 
-    def getMotControl(self, controlAxis: ControlAxes):
+    def getThrusterControl(self, controlAxis: ControlAxes):
         self.__updateControl()
         return self.__motsOutputsReal[controlAxis]
     
