@@ -63,10 +63,18 @@ class ControlSystem:
         if np.abs(self.__axesInputs[Axes.YAW]) >= 1 or not self.__stabs[Axes.YAW] : 
             self.setPIDSetpoint(Axes.YAW, self.__axesValues[Axes.YAW])
 
-        yawPID = self.__PIDs[Axes.YAW].update(self.__axesValues[Axes.YAW], self.__dt) if (np.abs(self.__axesInputs[Axes.YAW]) < 1) and self.__stabs[Axes.YAW] else 0 
-        rollPID = self.__PIDs[Axes.ROLL].update(self.__axesValues[Axes.ROLL], self.__dt) if self.__stabs[Axes.ROLL] else 0
-        pitchPID = self.__PIDs[Axes.PITCH].update(self.__axesValues[Axes.PITCH], self.__dt) if self.__stabs[Axes.PITCH] else 0
+        absroll = abs(self.__axesValues[Axes.ROLL])
+        absyaw = abs(self.__axesValues[Axes.YAW])
+        abspitch = abs(self.__axesValues[Axes.PITCH])
+
+        yawPID = self.__PIDs[Axes.YAW].update(absyaw, self.__dt) if (np.abs(self.__axesInputs[Axes.YAW]) < 1) and self.__stabs[Axes.YAW] else 0 
+        rollPID = self.__PIDs[Axes.ROLL].update(absroll, self.__dt) if self.__stabs[Axes.ROLL] else 0
+        pitchPID = self.__PIDs[Axes.PITCH].update(abspitch, self.__dt) if self.__stabs[Axes.PITCH] else 0
         depthPID = -self.__PIDs[Axes.DEPTH].update(self.__axesValues[Axes.DEPTH], self.__dt) if self.__stabs[Axes.DEPTH] else 0
+
+        rollPID *= -1 if self.__axesValues[Axes.ROLL] < 0 else 1
+        pitchPID *= -1 if self.__axesValues[Axes.PITCH] < 0 else 1
+        yawPID *= -1 if self.__axesValues[Axes.YAW] < 0 else 1
 
         self.__PIDValues[Axes.YAW] = constrain(yawPID, -100, 100)
         self.__PIDValues[Axes.ROLL] = constrain(rollPID, -100, 100)
