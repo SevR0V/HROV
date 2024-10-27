@@ -73,12 +73,12 @@ if controlType == ControlType.DIRECT_CTRL:
     #init thrusters
     thrustersPins = [0] * 6
 
-    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.H_FORW_TOP)]     = 10
+    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.H_FORW_TOP)]    = 10
     thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.H_FORW_BOT)]    = 9
-    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.H_SIDE_FRONT)]           = 17
-    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.H_SIDE_REAR)]     = 22
-    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.V_RIGHT)]    = 27
-    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.V_LEFT)]           = 11
+    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.H_SIDE_FRONT)]  = 17
+    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.H_SIDE_REAR)]   = 22
+    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.V_RIGHT)]       = 27
+    thrustersPins[thrustersOrder.index(ControlSystem.Thrusters.V_LEFT)]        = 11
 
     thrusters = Thrusters(pi, thrustersPins, [16], [[0, 0],[0, 0],[0, 0],[0, 0],[0, 0],[0, 0]], [[0, 0],[0, 0],[0, 0],[0, 0],[0, 0],[0, 0]])
 
