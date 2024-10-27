@@ -91,8 +91,6 @@ if controlType == ControlType.DIRECT_CTRL:
     #init main server
     udp_server = RemoteUdpDataServer(controlSystem, timer, imuType, controlType, bridge, navx, thrusters, lights, cameraServo)
 
-
-
 #create tasks
 serial_task = None
 task = None
