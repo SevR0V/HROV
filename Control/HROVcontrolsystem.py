@@ -39,9 +39,9 @@ class ControlSystem:
         self.__PIDs = [None, 
                      None, 
                      PID(10, 0, 0, 0),
-                     PID(10, 0, 0, 0),
-                     PID(10, 0, 0, 0),
-                     PID(10, 0, 0, 0)]
+                     PID(10, 0, 0, 0, True),
+                     PID(10, 0, 0, 0, True),
+                     PID(10, 0, 0, 0, True)]
         self.__filters = [None, 
                           None, 
                           ExpMovingAverageFilter(0.8),
@@ -70,9 +70,9 @@ class ControlSystem:
         pitchPID = self.__PIDs[Axes.PITCH].update(abspitch, self.__dt) if self.__stabs[Axes.PITCH] else 0
         depthPID = -self.__PIDs[Axes.DEPTH].update(self.__axesValues[Axes.DEPTH], self.__dt) if self.__stabs[Axes.DEPTH] else 0
 
-        rollPID *= -1 if self.__axesValues[Axes.ROLL] < 0 else 1
-        pitchPID *= -1 if self.__axesValues[Axes.PITCH] < 0 else 1
-        yawPID *= -1 if self.__axesValues[Axes.YAW] < 0 else 1
+        # rollPID *= -1 if self.__axesValues[Axes.ROLL] < 0 else 1
+        # pitchPID *= -1 if self.__axesValues[Axes.PITCH] < 0 else 1
+        # yawPID *= -1 if self.__axesValues[Axes.YAW] < 0 else 1
 
         self.__PIDValues[Axes.YAW] = constrain(yawPID, -100, 100)
         self.__PIDValues[Axes.ROLL] = constrain(rollPID, -100, 100)

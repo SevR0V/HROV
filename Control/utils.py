@@ -46,7 +46,8 @@ class ExpMovingAverageFilter:
         #return new_value
 
 class PID:
-    def __init__(self, Kp, Ki, Kd, setpoint):
+    def __init__(self, Kp, Ki, Kd, setpoint, isAngles = False):
+        self.isAngles = isAngles
         self.Kp = Kp
         self.Ki = Ki
         self.Kd = Kd
@@ -55,7 +56,11 @@ class PID:
         self.integral = 0
 
     def update(self, measured_value, dt):
-        error = self.setpoint - measured_value
+        error = None
+        if self.isAngles:
+            error = (self.setpoint - measured_value + 180) % 360 - 180
+        else:
+            error = self.setpoint - measured_value
         self.integral += error * dt
         derivative = (error - self.last_error) / dt
         output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
