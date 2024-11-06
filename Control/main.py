@@ -16,7 +16,7 @@ from servo import Servo
 #select IMU
 # IMUType.NAVX
 # IMUType.POLOLU
-imuType = IMUType.NAVX
+imuType = IMUType.POLOLU
 
 #select contol type
 # ControlType.DIRECT_CTRL
