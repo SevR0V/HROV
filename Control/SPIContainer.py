@@ -17,7 +17,7 @@ class RxBufferOffsets(IntEnum):
     CUR_LIGHT1 = 61
     CUR_LIGHT2 = 65
     VOLTS24 = 69
-    MAGIC_END = 99
+    MAGIC_END = 1199
 
 class TxBufferOffsets(IntEnum):
     MAGIC_START = 0
@@ -25,7 +25,7 @@ class TxBufferOffsets(IntEnum):
     MOTORS = 9
     CAM_ANGLE = 33
     LIGHT = 37 
-    MAGIC_END = 99
+    MAGIC_END = 199
 
 
 SPI_RX_EULERx_FLAG =        np.uint64(1 << 0)
@@ -54,7 +54,7 @@ def countPacketfSize(packetf):
 def formPacket(defPacket):
     packetSize = countPacketfSize(defPacket)    
     packetSize += 2
-    hollowSize = 100 - packetSize
+    hollowSize = 200 - packetSize
     resPacket = defPacket
     for i in range(hollowSize):
         resPacket += "B"
@@ -63,7 +63,7 @@ def formPacket(defPacket):
 
 
 class SPI_Xfer_Container:
-    BUFFER_SIZE = 100
+    BUFFER_SIZE = 200
     MAGIC_START = 0xAB
     MAGIC_END = 0xCD
 
