@@ -17,7 +17,7 @@ class RxBufferOffsets(IntEnum):
     CUR_LIGHT1 = 61
     CUR_LIGHT2 = 65
     VOLTS24 = 69
-    MAGIC_END = 1199
+    MAGIC_END = 199
 
 class TxBufferOffsets(IntEnum):
     MAGIC_START = 0

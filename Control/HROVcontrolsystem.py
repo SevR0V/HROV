@@ -24,11 +24,11 @@ class ControlSystem:
         # Thrusters calibration values
         self.__thrustersDirCorr = [1, 1, 1, 1, 1, 1]
         self.__thrustersOrder = [ThrustersNames.H_FORW_TOP, 
-                  ThrustersNames.H_FORW_BOT,
-                  ThrustersNames.H_SIDE_FRONT, 
-                  ThrustersNames.H_SIDE_REAR,
-                  ThrustersNames.V_RIGHT,
-                  ThrustersNames.V_LEFT]
+                                 ThrustersNames.H_FORW_BOT,
+                                 ThrustersNames.H_SIDE_FRONT, 
+                                 ThrustersNames.H_SIDE_REAR,
+                                 ThrustersNames.V_RIGHT,
+                                 ThrustersNames.V_LEFT]
         self.__trustersXValues = [-100, 100]
         self.__thrusterIncrement = 0.5
         # (forward,strafe,depth,roll,pitch,yaw)
@@ -37,11 +37,11 @@ class ControlSystem:
         self.__stabs          = [0, 0, 0, 0, 0, 0]
         self.__PIDValues      = [0, 0, 0, 0, 0, 0]
         self.__PIDs = [None, 
-                     None, 
-                     PID(10, 0, 0, 0),
-                     PID(10, 0, 0, 0, True),
-                     PID(10, 0, 0, 0, True),
-                     PID(10, 0, 0, 0, True)]
+                       None, 
+                       PID(1, 0, 0, 0),
+                       PID(1, 0, 0, 0, True),
+                       PID(1, 0, 0, 0, True),
+                       PID(1, 0, 0, 0, True)]
         self.__filters = [None, 
                           None, 
                           ExpMovingAverageFilter(0.8),

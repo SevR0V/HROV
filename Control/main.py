@@ -37,14 +37,20 @@ cameraServo = None
 udp_server = None
 
 #init thrusters parameters
-thrustersOrder = [ThrustersNames.H_FORW_TOP, 
-                  ThrustersNames.H_FORW_BOT,
-                  ThrustersNames.H_SIDE_FRONT, 
+# thrustersOrder = [ThrustersNames.H_FORW_TOP, 
+#                   ThrustersNames.H_FORW_BOT,
+#                   ThrustersNames.H_SIDE_FRONT, 
+#                   ThrustersNames.H_SIDE_REAR,
+#                   ThrustersNames.V_RIGHT,
+#                   ThrustersNames.V_LEFT]
+thrustersOrder = [ThrustersNames.H_FORW_TOP,
+                  ThrustersNames.V_RIGHT, 
+                  ThrustersNames.H_FORW_BOT, 
                   ThrustersNames.H_SIDE_REAR,
-                  ThrustersNames.V_RIGHT,
+                  ThrustersNames.H_SIDE_FRONT,
                   ThrustersNames.V_LEFT]
-thrustersDirCorr = [1, 1, 1, 1, 1, 1]
-trustersXValues = [-50, 50]
+thrustersDirCorr = [1, -1, -1, 1, 1, 1]
+trustersXValues = [-100, 100]
 
 #init control system
 controlSystem = ControlSystem()
@@ -63,7 +69,7 @@ if imuType == IMUType.NAVX:
 if controlType == ControlType.STM_CTRL:
     #init SPI parameters
     SPIChannel = 0
-    SPISpeed = 500000
+    SPISpeed = 300000
     SPIFlags = 0
     bridge = SPI_Xfer_Container(pi, SPIChannel, SPISpeed, SPIFlags)
 

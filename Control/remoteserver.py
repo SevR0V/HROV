@@ -95,8 +95,8 @@ class RemoteUdpDataServer(asyncio.Protocol):
 
         self.maxPowerTarget = 1
         
-        self.newRxPacket = False
-        self.newTxPacket = False
+        self.newRxPacket = True
+        self.newTxPacket = True
 
         if self.imuType == IMUType.NAVX:
             navx.subscribe(self.navx_data_received)
@@ -173,16 +173,16 @@ class RemoteUdpDataServer(asyncio.Protocol):
             # controlFlags, forward, strafe, vertical, rotation, rollInc, pitchInc, powerTarget, cameraRotate, manipulatorGrip, manipulatorRotate, rollKp, rollKi, rollKd, pitchKp, pitchKi, pitchKd, yawKp, yawKi, yawKd, depthKp, depthKi, depthKd
             # flags = MASTER, lightState, stabRoll, stabPitch, stabYaw, stabDepth, resetPosition, resetIMU, updatePID
             received = struct.unpack_from("=Qfffffffffffffffffff", packet)
-            self.MASTER = received[UDPRxValues.FLAGS] & UDP_FLAGS_MASTERx
-            self.lightState = received[UDPRxValues.FLAGS] & UDP_FLAGS_LIGHT_STATEx
-            rollStab =  received[UDPRxValues.FLAGS] & UDP_FLAGS_STAB_ROLLx
-            pitchStab = received[UDPRxValues.FLAGS] & UDP_FLAGS_STAB_PITCHx
-            yawStab =   received[UDPRxValues.FLAGS] & UDP_FLAGS_STAB_YAWx
-            depthStab = received[UDPRxValues.FLAGS] & UDP_FLAGS_STAB_DEPTHx
-            resetPosition = received[UDPRxValues.FLAGS] & UDP_FLAGS_RESET_POSITIONx
-            self.resetIMU = received[UDPRxValues.FLAGS] & UDP_FLAGS_RESET_IMUx
-            updatePID = received[UDPRxValues.FLAGS] & UDP_FLAGS_UPDATE_PIDx
-            
+            self.MASTER =       np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_MASTERx
+            self.lightState =   np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_LIGHT_STATEx
+            rollStab =          np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_STAB_ROLLx
+            pitchStab =         np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_STAB_PITCHx
+            yawStab =           np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_STAB_YAWx
+            depthStab =         np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_STAB_DEPTHx
+            resetPosition =     np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_RESET_POSITIONx
+            self.resetIMU =     np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_RESET_IMUx
+            updatePID =         np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_UPDATE_PIDx
+
             self.controlSystem.setStabilization(Axes.ROLL, rollStab)
             self.controlSystem.setStabilization(Axes.PITCH, pitchStab)
             self.controlSystem.setStabilization(Axes.YAW, yawStab)
