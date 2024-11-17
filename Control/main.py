@@ -12,10 +12,12 @@ import serial_asyncio
 from thruster import Thrusters
 from ligths import Lights
 from servo import Servo
+from MultiaxisManipulator import MultiaxisManipulator
 
 #select IMU
 # IMUType.NAVX
 # IMUType.POLOLU
+# IMUType.HIWONDER
 imuType = IMUType.POLOLU
 
 #select contol type
@@ -52,6 +54,8 @@ thrustersOrder = [ThrustersNames.H_FORW_TOP,
 thrustersDirCorr = [1, -1, -1, 1, 1, 1]
 trustersXValues = [-100, 100]
 
+manipulator = MultiaxisManipulator(3)
+
 #init control system
 controlSystem = ControlSystem()
 controlSystem.setThrustersCalibrationValues(thrustersDirCorr, thrustersOrder, trustersXValues, 2)
@@ -74,7 +78,7 @@ if controlType == ControlType.STM_CTRL:
     bridge = SPI_Xfer_Container(pi, SPIChannel, SPISpeed, SPIFlags)
 
     #init main server
-    udp_server = RemoteUdpDataServer(controlSystem, timer, imuType, controlType, bridge, navx)
+    udp_server = RemoteUdpDataServer(controlSystem, timer, imuType, controlType, manipulator, bridge, navx)
 
 if controlType == ControlType.DIRECT_CTRL:
     #init thrusters
@@ -96,7 +100,7 @@ if controlType == ControlType.DIRECT_CTRL:
     lights = Lights(pi, [19, 26])
 
     #init main server
-    udp_server = RemoteUdpDataServer(controlSystem, timer, imuType, controlType, bridge, navx, thrusters, lights, cameraServo)
+    udp_server = RemoteUdpDataServer(controlSystem, timer, imuType, controlType, manipulator, bridge, navx, thrusters, lights, cameraServo)
 
 #create tasks
 serial_task = None

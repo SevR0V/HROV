@@ -13,6 +13,11 @@ from thruster import Thrusters
 from navx import Navx
 from ligths import Lights
 from servo import Servo
+from utils import constrain, map_value
+from async_hiwonder_reader import AsyndHiwonderReader
+import time
+import copy
+from MultiaxisManipulator import MultiaxisManipulator
 
 to_rad = math.pi / 180
 
@@ -25,10 +30,16 @@ UDP_FLAGS_STAB_DEPTHx = np.uint64(1 << 5)
 UDP_FLAGS_RESET_POSITIONx = np.uint64(1 << 6)
 UDP_FLAGS_RESET_IMUx = np.uint64(1 << 7)
 UDP_FLAGS_UPDATE_PIDx = np.uint64(1 << 8)
+UDP_FLAGS_MANIPULATOR_ANGLE_1_UPDATE_x = np.uint64(1 << 9)
+UDP_FLAGS_MANIPULATOR_ANGLE_2_UPDATE_x = np.uint64(1 << 10)
+UDP_FLAGS_MANIPULATOR_ANGLE_3_UPDATE_x = np.uint64(1 << 11)
+
+YAW_CAP = 0.3
 
 class IMUType(IntEnum):
     POLOLU = 0
     NAVX = 1
+    HIWONDER = 2
 
 class ControlType(IntEnum):
     DIRECT_CTRL = 0
@@ -57,12 +68,17 @@ class UDPRxValues(IntEnum):
     YAW_KD = 19
     DEPTH_KP = 20
     DEPTH_KI = 21
-    DEPTH_KD = 22        
+    DEPTH_KD = 22
+    MANIPULATOR_ANGLE_1 = 23
+    MANIPULATOR_ANGLE_2 = 24
+    MANIPULATOR_ANGLE_3 = 25
 
 class RemoteUdpDataServer(asyncio.Protocol):
-    def __init__(self, contolSystem: ControlSystem, timer: AsyncTimer, imuType: IMUType, controlType: ControlType, bridge: SPI_Xfer_Container = None, navx: Navx = None, thrusters: Thrusters = None,
-                 lights: Lights = None, cameraServo: Servo = None):
+    def __init__(self, contolSystem: ControlSystem, timer: AsyncTimer, imuType: IMUType, controlType: ControlType, manipulator: MultiaxisManipulator,
+                  bridge: SPI_Xfer_Container = None, navx: Navx = None, thrusters: Thrusters = None,
+                  lights: Lights = None, cameraServo: Servo = None, hiwonderReader: AsyndHiwonderReader = None):
         self.controlType = controlType
+        self.hiwonderReader = hiwonderReader
         self.imuType = imuType
         self.timer = timer
         self.bridge = bridge        
@@ -72,14 +88,18 @@ class RemoteUdpDataServer(asyncio.Protocol):
         self.lights = lights
         self.cameraServo = cameraServo
         self.remoteAddres = None
-        timer.subscribe(self.dataCalculationTransfer)
-        timer.start()
+        self.manipulator = manipulator
+        self.timer.subscribe(self.dataCalculationTransfer)
+        self.timer.start()
+        if self.hiwonderReader is not None:
+            self.hiwonderReader.start()
         self.powerTarget = 0
         self.cameraRotate = 0
-        self.cameraAngle = 0
+        self.cameraAngle = 65
         self.lightState = 0
         self.eulers = [0.0, 0.0, 0.0]
         self.accelerations = [0.0, 0.0, 0.0]
+        self.gyro = [0.0, 0.0, 0.0]
         self.IMURaw = [0.0, 0.0, 0.0]
         self.eulerMag = [0.0, 0.0, 0.0]
         self.voltage = 0
@@ -93,10 +113,16 @@ class RemoteUdpDataServer(asyncio.Protocol):
         self.resetIMU = 0
         self.ERRORFLAGS = np.uint64(0)
 
-        self.maxPowerTarget = 1
+        self.maxPowerTarget = 1.0
         
         self.newRxPacket = True
         self.newTxPacket = True
+        
+        self.depthDelay = 10
+        self.counter = 0
+
+        self.time1 = time.time()
+        self.time2 = time.time()
 
         if self.imuType == IMUType.NAVX:
             navx.subscribe(self.navx_data_received)
@@ -137,7 +163,8 @@ class RemoteUdpDataServer(asyncio.Protocol):
             self.controlSystem.setAxisInput(Axes.YAW, (received[4] ** 3) * 100 * self.powerTarget) 
 
             self.cameraRotate = received[7]
-            self.cameraAngle += self.cameraRotate * self.incrementScale
+            self.cameraAngle += self.cameraRotate * self.incrementScale * 3
+            self.cameraAngle = constrain(self.cameraAngle, 40, 90)
             self.lightState = received[9]
 
             rollStab =  1 if received[10] & 0b00000001 else 0
@@ -170,33 +197,35 @@ class RemoteUdpDataServer(asyncio.Protocol):
                 self.controlSystem.setPIDConstants(Axes.YAW, [received[20], received[21], received[22]])
                 self.controlSystem.setPIDConstants(Axes.DEPTH, [received[23], received[24], received[25]])
         else:
-            # controlFlags, forward, strafe, vertical, rotation, rollInc, pitchInc, powerTarget, cameraRotate, manipulatorGrip, manipulatorRotate, rollKp, rollKi, rollKd, pitchKp, pitchKi, pitchKd, yawKp, yawKi, yawKd, depthKp, depthKi, depthKd
-            # flags = MASTER, lightState, stabRoll, stabPitch, stabYaw, stabDepth, resetPosition, resetIMU, updatePID
-            received = struct.unpack_from("=Qfffffffffffffffffff", packet)
-            self.MASTER =       np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_MASTERx
-            self.lightState =   np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_LIGHT_STATEx
-            rollStab =          np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_STAB_ROLLx
-            pitchStab =         np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_STAB_PITCHx
-            yawStab =           np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_STAB_YAWx
-            depthStab =         np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_STAB_DEPTHx
-            resetPosition =     np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_RESET_POSITIONx
-            self.resetIMU =     np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_RESET_IMUx
-            updatePID =         np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_UPDATE_PIDx
-
+            # controlFlags, forward, strafe, vertical, rotation, rollInc, pitchInc, powerTarget, cameraRotate, manipulatorGrip, 
+            # manipulatorRotate, rollKp, rollKi, rollKd, pitchKp, pitchKi, pitchKd, yawKp, yawKi, yawKd, depthKp, depthKi, depthKd,
+            # manipulatorAngle1, manipulatorAngle2, manipulatorAngle3
+            # flags = MASTER, lightState, stabRoll, stabPitch, stabYaw, stabDepth, resetPosition, resetIMU, updatePID, manipulatorAngleUpdate1, manipulatorAngleUpdate2, manipulatorAngleUpdate3
+            received = struct.unpack_from("=Qffffffffffffffffffffff", packet)
+            self.MASTER = np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_MASTERx
+            self.lightState = np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_LIGHT_STATEx
+            rollStab =  np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_STAB_ROLLx
+            pitchStab = np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_STAB_PITCHx
+            yawStab =   np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_STAB_YAWx
+            depthStab = np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_STAB_DEPTHx
+            resetPosition = np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_RESET_POSITIONx
+            self.resetIMU = np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_RESET_IMUx
+            updatePID = np.uint64(received[UDPRxValues.FLAGS]) & UDP_FLAGS_UPDATE_PIDx
+            
             self.controlSystem.setStabilization(Axes.ROLL, rollStab)
             self.controlSystem.setStabilization(Axes.PITCH, pitchStab)
             self.controlSystem.setStabilization(Axes.YAW, yawStab)
             self.controlSystem.setStabilization(Axes.DEPTH, depthStab) 
 
-            self.powerTarget = received[UDPRxValues.POWER_TARGET] * self.maxPowerTarget
+            self.powerTarget = received[UDPRxValues.POWER_TARGET] 
             
-            self.controlSystem.setAxisInput(Axes.FORWARD, (received[UDPRxValues.FORWARD] ** 3) * 100 * self.powerTarget)
-            self.controlSystem.setAxisInput(Axes.STRAFE, (received[UDPRxValues.STRAFE] ** 3) * 100 * self.powerTarget)
-            self.controlSystem.setAxisInput(Axes.DEPTH, (received[UDPRxValues.VERTICAL] ** 3) * 100 * self.powerTarget)
-            self.controlSystem.setAxisInput(Axes.YAW, (received[UDPRxValues.ROTATION] ** 3) * 100 * self.powerTarget)
+            self.controlSystem.setAxisInput(Axes.FORWARD, (received[UDPRxValues.FORWARD] ** 3) * 100 * self.powerTarget * self.maxPowerTarget)
+            self.controlSystem.setAxisInput(Axes.STRAFE, (received[UDPRxValues.STRAFE] ** 3) * 100 * self.powerTarget * self.maxPowerTarget)
+            self.controlSystem.setAxisInput(Axes.DEPTH, (received[UDPRxValues.VERTICAL] ** 3) * 100 * self.powerTarget * self.maxPowerTarget)
+            self.controlSystem.setAxisInput(Axes.YAW, (received[UDPRxValues.ROTATION]) * 100 * self.powerTarget * YAW_CAP)
 
             rollInc = received[UDPRxValues.ROLL_INC]
-            pitchInc = received[UDPRxValues.ROLL_INC]
+            pitchInc = received[UDPRxValues.PITCH_INC]
 
             if rollInc:
                 rollSP = self.controlSystem.getPIDSetpoint(Axes.ROLL) + rollInc * self.incrementScale
@@ -222,32 +251,36 @@ class RemoteUdpDataServer(asyncio.Protocol):
                 self.controlSystem.setStabilizations([0,0,0,0,0,0])
             
             if self.resetIMU:
-                self.IMUErrors = [self.controlSystem.getAxisValue(Axes.ROLL),
-                                  self.controlSystem.getAxisValue(Axes.PITCH),
-                                  self.controlSystem.getAxisValue(Axes.YAW)]
+                self.IMUErrors = copy.copy(self.eulers)
                        
         self.controlSystem.setdt(self.timer.getInterval())
 
     def navx_data_received(self, sender, data):
-        pitch, roll, yaw, heading = data
-        self.eulers = [roll, pitch, yaw]
+        roll, pitch, yaw, heading = data
+        self.eulers = [roll, -pitch, yaw]
+        
 
     def dataCalculationTransfer(self):
-        if self.ds_init:
-            if self.depth_sensor.read(ms5837.OSR_256):
-                self.depth = self.depth_sensor.pressure(ms5837.UNITS_atm)*10-10
+        self.time2 = time.time()
+        #print("%.4f"%(self.time2-self.time1))
+        self.time1 = self.time2
+
+        self.counter += 1
+        if self.counter >= self.depthDelay:
+            self.counter = 0
+            if self.ds_init:
+                if self.depth_sensor.read(ms5837.OSR_8192):
+                    self.depth = self.depth_sensor.pressure(ms5837.UNITS_atm)*10-10
 
         thrust = self.controlSystem.getThrustersControls()
 
-        print(*["%.2f" % elem for elem in thrust], sep ='; ')
-
+        #print(*["%.2f" % elem for elem in thrust], sep ='; ')            
         if self.MASTER:
             if self.controlType == ControlType.STM_CTRL:
                 self.bridge.set_cam_angle_value(self.cameraAngle)
                 lightsValues = [50*self.lightState, 50*self.lightState]
                 self.bridge.set_lights_values(lightsValues)            
                 self.bridge.set_mots_values(thrust)
-                self.bridge.set_cam_angle_value(self.cameraAngle)
 
             if self.controlType == ControlType.DIRECT_CTRL:
                 self.thrusters.set_thrust_all(thrust)
@@ -256,9 +289,20 @@ class RemoteUdpDataServer(asyncio.Protocol):
                     self.lights.on()
                 else:
                     self.lights.off()
-
+        else:
+            thrust = [0.0]*6
+            if self.controlType == ControlType.DIRECT_CTRL:
+                self.thrusters.set_thrust_all(thrust)
+                self.lights.off()
                 self.cameraServo.rotate(self.cameraAngle)
+            if self.controlType == ControlType.STM_CTRL:
+                self.bridge.set_cam_angle_value(self.cameraAngle)
+                lightsValues = [0, 0]
+                self.bridge.set_lights_values(lightsValues)            
+                self.bridge.set_mots_values(thrust)                            
 
+        if self.imuType == IMUType.HIWONDER:
+            self.eulers = self.hiwonderReader.getIMUAngles()
         if self.controlType == ControlType.STM_CTRL:
             try:
                 # Transfer data over SPI
@@ -289,18 +333,18 @@ class RemoteUdpDataServer(asyncio.Protocol):
             if curLights is not None:
                 self.curLights = curLights
 
-        self.controlSystem.setAxesValues([0, 0, 
-                            self.depth, 
-                            self.eulers[0] - self.IMUErrors[0], 
-                            self.eulers[1] - self.IMUErrors[1], 
-                            self.eulers[2] - self.IMUErrors[2]])
-        
+        self.controlSystem.setAxisValue(Axes.DEPTH, self.depth)
+        # print(*["%.2f" % elem for elem in self.eulers], sep ='; ')
+        # print(*["%.2f" % elem for elem in self.IMUErrors], sep ='; ')
+        self.controlSystem.setAxisValue(Axes.ROLL, self.eulers[0] - self.IMUErrors[0])
+        self.controlSystem.setAxisValue(Axes.PITCH, self.eulers[1] - self.IMUErrors[1])
+        self.controlSystem.setAxisValue(Axes.YAW, self.eulers[2] - self.IMUErrors[2])
         if self.remoteAddres:
             if not self.newTxPacket:
                 telemetry_data = struct.pack('=fffffff', self.controlSystem.getAxisValue(Axes.ROLL), 
                                             self.controlSystem.getAxisValue(Axes.PITCH), 
                                             self.controlSystem.getAxisValue(Axes.YAW), 
-                                            0.0, 
+                                            map_value(self.cameraAngle, 40, 90, -90, 90),
                                             self.controlSystem.getAxisValue(Axes.DEPTH), 
                                             self.controlSystem.getPIDSetpoint(Axes.ROLL), 
                                             self.controlSystem.getPIDSetpoint(Axes.PITCH))
@@ -323,7 +367,8 @@ class RemoteUdpDataServer(asyncio.Protocol):
                 self.transport.sendto(telemetry_data, self.remoteAddres)
                 
 
-    def shutdown(self):       
+    def shutdown(self):
+        self.timer.stop()
         if self.bridge is not None:
             self.bridge.close()
         if self.thrusters is not None:
