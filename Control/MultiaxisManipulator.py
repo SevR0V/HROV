@@ -9,11 +9,11 @@ class GripState(IntEnum):
 
 class ManipAxis:
     def __init__(self):
-        self.controlAngle = None
-        self.telemetryAngle = None
-        self.currentP1 = None
-        self.currentP2 = None
-        self.voltage = None
+        self.controlAngle = 0.0
+        self.telemetryAngle = 111.0
+        self.currentP1 = 222.1
+        self.currentP2 = 222.2
+        self.voltage = 333.0
     
     def getTelemetryAngle(self):
         return self.telemetryAngle
@@ -44,7 +44,7 @@ class ManipAxis:
 
 class ManipGrip:
     def __init__(self):
-        self.state = 0
+        self.state = GripState.UWMANIPULATOR_GRIP_STOP
     def open(self):
         self.state = GripState.UWMANIPULATOR_GRIP_OPEN
     def close(self):
@@ -62,30 +62,30 @@ class ManipGrip:
 
 class MultiaxisManipulator:
     def __init__(self, numAxes: int):
-        self.axes = [ManipAxis]*numAxes
-        self.grip = ManipGrip
+        self.axes = [ManipAxis(),ManipAxis(),ManipAxis()]
+        self.grip = ManipGrip()
         self.numAxes = numAxes
-        self.updateControlFlags = [False]*numAxes
-        self.updateTelemetryFlags = [[False, False]]*numAxes
+        self.updateControlFlags = [False]*(numAxes+1)
+        # self.updateTelemetryFlags = [[False, False]]*numAxes
 
     def setControlFlags(self, flags):
-        if not len(flags) == self.numAxes:
+        if not len(flags) == (self.numAxes + 1):
             print("Incorrect Axes Number")
             return
         self.updateControlFlags = flags
     
-    def setTelemetryFlags(self, flags):
-        if not len(flags) == self.numAxes:
-            print("Incorrect Axes Number")
-            return
-        self.updateTelemetryFlags = flags
+    # def setTelemetryFlags(self, flags):
+    #     if not len(flags) == self.numAxes:
+    #         print("Incorrect Axes Number")
+    #         return
+    #     self.updateTelemetryFlags = flags
 
     def setControlAngleAll(self, angles: list[float]):
         if not len(angles) == self.numAxes:
             print("Incorrect Axes Number")
             return
         for i, axis in enumerate(self.axes):
-            axis.setControlAngle(angles[i])
+             axis.setControlAngle(angles[i])
 
     def setAxisControlAngle(self, axisIndex, angle):
         if not axisIndex in range(self.numAxes):
@@ -151,7 +151,7 @@ class MultiaxisManipulator:
         angles = [0.0]*self.numAxes
         for i, axis in enumerate(self.axes):
             angles[i] = axis.getTelemetryAngle()
-        return [angles]
+        return angles
 
     def getAxisTelemetryAngle(self, axisIndex):
         if not axisIndex in range(self.numAxes):
@@ -162,7 +162,7 @@ class MultiaxisManipulator:
         angles = [0.0]*self.numAxes
         for i, axis in enumerate(self.axes):
             angles[i] = axis.getControlAngle()
-        return [angles]
+        return angles
 
     def getAxisControlAngle(self, axisIndex):
         if not axisIndex in range(self.numAxes):
@@ -173,7 +173,7 @@ class MultiaxisManipulator:
         voltages = [0.0]*self.numAxes
         for i, axis in enumerate(self.axes):
             voltages[i] = axis.getVoltage()
-        return [voltages]
+        return voltages
 
     def getAxisVoltage(self, axisIndex):
         if not axisIndex in range(self.numAxes):
@@ -184,7 +184,7 @@ class MultiaxisManipulator:
         currents = [[0.0, 0.0]]*self.numAxes
         for i, axis in enumerate(self.axes):
             currents[i] = axis.getCurrent()
-        return [currents]
+        return currents
 
     def getAxisCurrent(self, axisIndex):
         if not axisIndex in range(self.numAxes):
@@ -192,8 +192,8 @@ class MultiaxisManipulator:
         return self.axes[axisIndex].getCurrent()
     
     def getGripState(self):
-        state = self.getGripState() + 1
+        state = self.grip.getState()
         return state
 
-    def getAxisNumber(self):
+    def getAxesNumber(self):
         return self.numAxes

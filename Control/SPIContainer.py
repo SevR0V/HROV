@@ -32,8 +32,8 @@ class TxBufferOffsets(IntEnum):
     MOTORS = 9
     CAM_ANGLE = 33
     LIGHT = 37
-    MAN_ANGLES = 41
-    MAN_GRIP = 53
+    MAN_ANGLES = 45
+    MAN_GRIP = 57
     MAGIC_END = 199
 
 
@@ -45,7 +45,7 @@ SPI_RX_CUR_ALL_FLAG =      np.uint64(1 << 4)
 SPI_RX_CUR_LIGHT1_FLAG =   np.uint64(1 << 5)
 SPI_RX_CUR_LIGHT2_FLAG =   np.uint64(1 << 6)
 SPI_RX_VOLTS24_FLAG =      np.uint64(1 << 7)
-SPI_RX_MOTx_PHASE_A_FLAG = lambda x: np.uint64(1 << (8  +x))
+SPI_RX_MOTx_PHASE_A_FLAG = lambda x: np.uint64(1 << (8  + x))
 SPI_RX_MOTx_PHASE_B_FLAG = lambda x: np.uint64(1 << (14 + x))
 SPI_RX_MOTx_PHASE_C_FLAG = lambda x: np.uint64(1 << (20 + x))
 SPI_RX_MAN_UNITx_VOLTAGE_FLAG =      lambda x: np.uint64(1 << (26 + x))
@@ -57,10 +57,10 @@ SPI_TX_DES_MOTORS_FLAG =       np.uint64(1 << 0)
 SPI_TX_DES_LIGHT_FLAG =        np.uint64(1 << 1)
 SPI_TX_DES_CAM_ANGLE_FLAG =    np.uint64(1 << 2)
 SPI_TX_DES_MAN_Qx_FLAG =       lambda x: np.uint64(1 << (3 + x))
-SPI_TX_DES_MAN_GRIP_FLAG =     lambda x: np.uint64(1 << 6)
+SPI_TX_DES_MAN_GRIP_FLAG =     np.uint64(1 << 6)
 
 
-baseRxPacket = "Qffffffffffffffff"
+baseRxPacket = "Qffffffffffffffffffffffffffffffffffffffffffffff"
 
 def countPacketfSize(packetf):
     packetSize = 0
@@ -111,7 +111,7 @@ class SPI_Xfer_Container:
         self.voltage24 = 0
         self.thrustersPhaseCurrents = [[0.0]*3]*6
         self.manVoltages = [0.0]*3
-        self.manPhasesCurrents = [[0.0]*2]*3
+        self.manPhaseCurrents = [[0.0]*2]*3
         self.manAngles = [0.0]*3
 
         self.tx_refresh_flags = np.uint64(0)
@@ -127,6 +127,7 @@ class SPI_Xfer_Container:
         except:
             print("SPI RX WRONG PACKET")
             return False
+        
         self.rx_refresh_flags = np.uint64(rxPacket[1])
         self.euler = [rxPacket[2], rxPacket[3], rxPacket[4]] if self.rx_refresh_flags & SPI_RX_EULER_FLAG else None
         self.eulerAcc = [rxPacket[5], rxPacket[6], rxPacket[7]] if self.rx_refresh_flags & SPI_RX_EULER_ACC_FLAG else None
@@ -136,6 +137,18 @@ class SPI_Xfer_Container:
         self.cirrentLight1 = rxPacket[15] if self.rx_refresh_flags & SPI_RX_CUR_LIGHT1_FLAG else None
         self.cirrentLight2 = rxPacket[16] if self.rx_refresh_flags & SPI_RX_CUR_LIGHT2_FLAG else None
         self.voltage24 = rxPacket[17] if self.rx_refresh_flags & SPI_RX_VOLTS24_FLAG else None
+        
+        for i in range(6):
+            self.thrustersPhaseCurrents[i][0] = rxPacket[18+i*3+0] if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_A_FLAG(i) else None
+            self.thrustersPhaseCurrents[i][1] = rxPacket[18+i*3+1] if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_B_FLAG(i) else None
+            self.thrustersPhaseCurrents[i][2] = rxPacket[18+i*3+2] if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_C_FLAG(i) else None
+        
+        for i in range(3):
+            self.manVoltages[i] = rxPacket[36+i] if self.rx_refresh_flags & SPI_RX_MAN_UNITx_VOLTAGE_FLAG(i) else None
+            self.manPhaseCurrents[i][0] = rxPacket[38+i*2+0] if self.rx_refresh_flags & SPI_RX_MAN_UNITx_PHASES_A_B_FLAG(i) else None
+            self.manPhaseCurrents[i][1] = rxPacket[38+i*2+1] if self.rx_refresh_flags & SPI_RX_MAN_UNITx_PHASES_A_B_FLAG(i) else None
+            self.manAngles[i] = rxPacket[50+i] if self.rx_refresh_flags & SPI_RX_MAN_UNITx_ANGLE_FLAG(i) else None 
+        
         return True
 
     def _fill_tx_buffer(self):
@@ -143,12 +156,12 @@ class SPI_Xfer_Container:
         self.tx_buffer[TxBufferOffsets.MAGIC_END] = self.MAGIC_END
 
         struct.pack_into('Q', self.tx_buffer, TxBufferOffsets.FLAGS, self.tx_refresh_flags)
-                
+                       
         if self.tx_refresh_flags & SPI_TX_DES_LIGHT_FLAG:
             for index in range(0, 2):           
                 offset = TxBufferOffsets.LIGHT + 4 * index
                 struct.pack_into('f', self.tx_buffer, offset, self.des_lights[index])
-
+        
         if self.tx_refresh_flags & SPI_TX_DES_MOTORS_FLAG:
             for index in range(0, 6):           
                 offset = TxBufferOffsets.MOTORS + 4 * index
@@ -157,11 +170,22 @@ class SPI_Xfer_Container:
         if self.tx_refresh_flags & SPI_TX_DES_CAM_ANGLE_FLAG:
             offset = TxBufferOffsets.CAM_ANGLE
             struct.pack_into('f', self.tx_buffer, offset, self.des_cam_angle)
-        #self.tx_refresh_flags = np.uint64(0)
+        
+        for index in range(3):
+            if self.tx_refresh_flags & SPI_TX_DES_MAN_Qx_FLAG(index):
+                offset = TxBufferOffsets.MAN_ANGLES + 4 * index
+                struct.pack_into('f', self.tx_buffer, offset, self.des_man_angles[index])
+        
+        if self.tx_refresh_flags & SPI_TX_DES_MAN_GRIP_FLAG:
+            offset = TxBufferOffsets.MAN_GRIP
+            struct.pack_into('B', self.tx_buffer, offset, self.des_man_grip_state)
 
     def transfer(self):
         self._fill_tx_buffer()
+        received = struct.unpack_from("QffffffffffffB", self.tx_buffer,1)
+        print(*["%.2f" % elem for elem in received], sep ='; ')
         count, self.rx_buffer = self.pi.spi_xfer(self.spi_handle, self.tx_buffer)
+        self.tx_refresh_flags = np.uint64(0)
         return self._parse_rx_buffer()
 
     # Setters
@@ -176,6 +200,16 @@ class SPI_Xfer_Container:
     def set_cam_angle_value(self, value):
         self.des_cam_angle = value
         self.tx_refresh_flags |= SPI_TX_DES_CAM_ANGLE_FLAG
+
+    def set_man_angle_value(self, index, value):
+        if not index in range(3):
+            return
+        self.des_man_angles[index] = value
+        self.tx_refresh_flags |= SPI_TX_DES_MAN_Qx_FLAG(index)
+
+    def set_man_grip_value(self, value):
+        self.des_man_grip_state = np.uint8(value)
+        self.tx_refresh_flags |= SPI_TX_DES_MAN_GRIP_FLAG 
 
     # Getters
     def get_IMU_angles(self):
@@ -228,6 +262,48 @@ class SPI_Xfer_Container:
             self.rx_refresh_flags &= ~(SPI_RX_VOLTS24_FLAG)
             return self.voltage24
         return None
+
+    def get_thrusters_phase_current(self, index, phase: str):
+        if not index in range(6):
+            return None
+        if not phase in ('A', 'B', 'C'):
+            return None
+        if phase == 'A':
+            if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_A_FLAG(index):
+                self.rx_refresh_flags &= ~(SPI_RX_MOTx_PHASE_A_FLAG(index))
+                return self.thrustersPhaseCurrents[index][0]
+        if phase == 'B':
+            if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_B_FLAG(index):
+                self.rx_refresh_flags &= ~(SPI_RX_MOTx_PHASE_B_FLAG(index))
+                return self.thrustersPhaseCurrents[index][1]
+        if phase == 'C':
+            if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_C_FLAG(index):
+                self.rx_refresh_flags &= ~(SPI_RX_MOTx_PHASE_C_FLAG(index))
+                return self.thrustersPhaseCurrents[index][2]
+        return None
+    
+    def get_man_voltage(self, index):
+        if not index in range(3):
+            return None
+        if self.rx_refresh_flags & SPI_RX_MAN_UNITx_VOLTAGE_FLAG(index):
+            self.rx_refresh_flags &= ~(SPI_RX_MAN_UNITx_VOLTAGE_FLAG(index))
+            return self.manVoltages[index]
+        return None
+    
+    def get_man_phase_currents(self, index):
+        if not index in range(3):
+            return None
+        if self.rx_refresh_flags & SPI_RX_MAN_UNITx_PHASES_A_B_FLAG(index):
+            self.rx_refresh_flags &= ~(SPI_RX_MAN_UNITx_PHASES_A_B_FLAG(index))
+            return self.manPhaseCurrents[index]
+        return None
+    
+    def get_man_angles(self, index):
+        if not index in range(3):
+            return None
+        if self.rx_refresh_flags & SPI_RX_MAN_UNITx_ANGLE_FLAG(index):
+            self.rx_refresh_flags &= ~(SPI_RX_MAN_UNITx_ANGLE_FLAG(index))
+            return self.manAngles[index]
 
     def close(self):
         self.pi.spi_close(self.spi_handle)
