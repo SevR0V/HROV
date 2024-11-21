@@ -242,9 +242,9 @@ class RemoteUdpDataServer(asyncio.Protocol):
                                                     manipulatorAngleUpdate2,
                                                     manipulatorAngleUpdate3,
                                                     manipulatorGripUpdate])
-                self.manipulator.setControlAngleAll([received[UDPRxValues.MANIPULATOR_ANGLE_1],
-                                                    received[UDPRxValues.MANIPULATOR_ANGLE_2],
-                                                    received[UDPRxValues.MANIPULATOR_ANGLE_3]])
+                self.manipulator.setControlAngleAll([received[UDPRxValues.MANIPULATOR_ANGLE_1]*to_rad,
+                                                     received[UDPRxValues.MANIPULATOR_ANGLE_2]*to_rad,
+                                                     received[UDPRxValues.MANIPULATOR_ANGLE_3]*to_rad])
                 self.manipulator.setGripState(received[UDPRxValues.MANIPULATOR_GRIP])
             self.controlSystem.setStabilization(Axes.ROLL, rollStab)
             self.controlSystem.setStabilization(Axes.PITCH, pitchStab)
@@ -420,7 +420,7 @@ class RemoteUdpDataServer(asyncio.Protocol):
                 
                 self.transport.sendto(telemetry_data, self.remoteAddres)
             else:
-                self.manTelemetryObtained = True
+                #self.manTelemetryObtained = True
                 if not (self.manTelemetryObtained  and (self.controlType == ControlType.STM_CTRL)):
                     # ERRORFLAGS, roll, pitch, yaw, depth, batVoltage, batCharge, batCurrent, rollSP, pitchSP
                     # mot1PhaseA, mot1PhaseB, mot1PhaseC, mot2PhaseA, mot2PhaseB, mot2PhaseC, mot3PhaseA, mot3PhaseB, mot3PhaseC, 
