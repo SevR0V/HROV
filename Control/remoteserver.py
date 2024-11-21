@@ -245,6 +245,7 @@ class RemoteUdpDataServer(asyncio.Protocol):
                 self.manipulator.setControlAngleAll([received[UDPRxValues.MANIPULATOR_ANGLE_1],
                                                     received[UDPRxValues.MANIPULATOR_ANGLE_2],
                                                     received[UDPRxValues.MANIPULATOR_ANGLE_3]])
+                self.manipulator.setGripState(received[UDPRxValues.MANIPULATOR_GRIP])
             self.controlSystem.setStabilization(Axes.ROLL, rollStab)
             self.controlSystem.setStabilization(Axes.PITCH, pitchStab)
             self.controlSystem.setStabilization(Axes.YAW, yawStab)
@@ -325,7 +326,6 @@ class RemoteUdpDataServer(asyncio.Protocol):
                             
                         if manControlFlags[3]:
                             self.bridge.set_man_grip_value(self.manipulator.getGripState())
-                            print(self.manipulator.getGripState())
                         self.manipulator.setControlFlags([False]*4)
 
                 if self.controlType == ControlType.DIRECT_CTRL:
