@@ -123,6 +123,8 @@ class RemoteUdpDataServer(asyncio.Protocol):
         self.newTxPacket = True
         if self.newRxPacket:
             self.MASTER = False
+            
+        self.manNoTelemetryCount = 0
         
         self.depthDelay = 10
         self.counter = 0
@@ -132,7 +134,7 @@ class RemoteUdpDataServer(asyncio.Protocol):
 
         self.time1 = time.time()
         self.time2 = time.time()
-        self.thrustersPhaseCurrents = [[0.0]*3]*6
+        self.thrustersPhaseCurrents = [[0.0, 0.0, 0.0],[0.0, 0.0, 0.0],[0.0, 0.0, 0.0],[0.0, 0.0, 0.0],[0.0, 0.0, 0.0],[0.0, 0.0, 0.0]]
 
         if self.imuType == IMUType.NAVX:
             navx.subscribe(self.navx_data_received)
@@ -298,59 +300,60 @@ class RemoteUdpDataServer(asyncio.Protocol):
         self.time2 = time.time()
         #print("%.4f"%(self.time2-self.time1))
         self.time1 = self.time2
+        try:
+            self.counter += 1
+            if self.counter >= self.depthDelay:
+                self.counter = 0
+                if self.ds_init:
+                    if self.depth_sensor.read(ms5837.OSR_8192):
+                        self.depth = self.depth_sensor.pressure(ms5837.UNITS_atm)*10-10
 
-        self.counter += 1
-        if self.counter >= self.depthDelay:
-            self.counter = 0
-            if self.ds_init:
-                if self.depth_sensor.read(ms5837.OSR_8192):
-                    self.depth = self.depth_sensor.pressure(ms5837.UNITS_atm)*10-10
+            thrust = self.controlSystem.getThrustersControls()
 
-        thrust = self.controlSystem.getThrustersControls()
+            #print(*["%.2f" % elem for elem in thrust], sep ='; ')    
 
-        #print(*["%.2f" % elem for elem in thrust], sep ='; ')    
+            if self.MASTER:
+                self.masterChangedToSafe = False
+                if self.controlType == ControlType.STM_CTRL:
+                    self.bridge.set_cam_angle_value(self.cameraAngle)
+                    lightsValues = [50*self.lightState, 50*self.lightState]
+                    self.bridge.set_lights_values(lightsValues)            
+                    self.bridge.set_mots_values(thrust)
+                    if self.manTelemetryObtained  and self.manControl:
+                        manControlFlags = self.manipulator.getControlFlags()
+                        for index in range(self.manipulator.getAxesNumber()):
+                            if manControlFlags[index]:
+                                self.bridge.set_man_angle_value(index,
+                                                                self.manipulator.getAxisControlAngle(index))
+                                
+                            if manControlFlags[3]:
+                                self.bridge.set_man_grip_value(self.manipulator.getGripState())
+                            self.manipulator.setControlFlags([False]*4)
 
-        if self.MASTER:
-            self.masterChangedToSafe = False
-            if self.controlType == ControlType.STM_CTRL:
-                self.bridge.set_cam_angle_value(self.cameraAngle)
-                lightsValues = [50*self.lightState, 50*self.lightState]
-                self.bridge.set_lights_values(lightsValues)            
-                self.bridge.set_mots_values(thrust)
-                if self.manTelemetryObtained  and self.manControl:
-                    manControlFlags = self.manipulator.getControlFlags()
-                    for index in range(self.manipulator.getAxesNumber()):
-                        if manControlFlags[index]:
-                            self.bridge.set_man_angle_value(index,
-                                                            self.manipulator.getAxisControlAngle(index))
-                            
-                        if manControlFlags[3]:
-                            self.bridge.set_man_grip_value(self.manipulator.getGripState())
-                        self.manipulator.setControlFlags([False]*4)
-
-                if self.controlType == ControlType.DIRECT_CTRL:
-                    self.thrusters.set_thrust_all(thrust)
-                    if self.lightState:
-                        self.lights.on()
-                    else:
-                        self.lights.off()
-            else:
-                if not self.masterChangedToSafe:
-                    self.masterChangedToSafe = True
-                    thrust = [0.0]*6
                     if self.controlType == ControlType.DIRECT_CTRL:
                         self.thrusters.set_thrust_all(thrust)
-                        self.lights.off()
-                        self.cameraServo.rotate(self.cameraAngle)
-                    if self.controlType == ControlType.STM_CTRL:
-                        self.bridge.set_cam_angle_value(self.cameraAngle)
-                        lightsValues = [0, 0]
-                        self.bridge.set_lights_values(lightsValues)            
-                        self.bridge.set_mots_values(thrust)
-                        if not self.manipulator.getGripState() == GripState.UWMANIPULATOR_GRIP_STOP:
-                            self.bridge.set_man_grip_value(GripState.UWMANIPULATOR_GRIP_STOP)
-                            self.manipulator.setGripState(GripState.UWMANIPULATOR_GRIP_STOP)
-
+                        if self.lightState:
+                            self.lights.on()
+                        else:
+                            self.lights.off()
+                else:
+                    if not self.masterChangedToSafe:
+                        self.masterChangedToSafe = True
+                        thrust = [0.0]*6
+                        if self.controlType == ControlType.DIRECT_CTRL:
+                            self.thrusters.set_thrust_all(thrust)
+                            self.lights.off()
+                            self.cameraServo.rotate(self.cameraAngle)
+                        if self.controlType == ControlType.STM_CTRL:
+                            self.bridge.set_cam_angle_value(self.cameraAngle)
+                            lightsValues = [0, 0]
+                            self.bridge.set_lights_values(lightsValues)            
+                            self.bridge.set_mots_values(thrust)
+                            if not self.manipulator.getGripState() == GripState.UWMANIPULATOR_GRIP_STOP:
+                                self.bridge.set_man_grip_value(GripState.UWMANIPULATOR_GRIP_STOP)
+                                self.manipulator.setGripState(GripState.UWMANIPULATOR_GRIP_STOP)
+        except Exception as ex:
+            print(ex)
         if self.imuType == IMUType.HIWONDER:
             self.eulers = self.hiwonderReader.getIMUAngles()
         if self.controlType == ControlType.STM_CTRL:
@@ -393,14 +396,25 @@ class RemoteUdpDataServer(asyncio.Protocol):
                 if angle is not None:
                     self.manipulator.setAxisTelemetryAngle(index, angle)
                     self.manTelemetryObtained = True
+                    self.manNoTelemetryCount = 0  
+                else:
+                    self.manNoTelemetryCount =+ 1 
                 phaseCurrents = self.bridge.get_man_phase_currents(index)
                 if phaseCurrents is not None:
                     self.manipulator.setAxisCurrent(index, phaseCurrents)
                     self.manTelemetryObtained = True
+                    self.manNoTelemetryCount = 0  
+                else:
+                    self.manNoTelemetryCount =+ 1 
                 voltage = self.bridge.get_man_voltage(index)
                 if voltage is not None:
                     self.manipulator.setAxisVoltage(index, voltage)
                     self.manTelemetryObtained = True
+                    self.manNoTelemetryCount = 0  
+                else:
+                    self.manNoTelemetryCount =+ 1  
+                if self.manNoTelemetryCount >= 15:
+                    self.manTelemetryObtained = False
 
         self.controlSystem.setAxisValue(Axes.DEPTH, self.depth)
         # print(*["%.2f" % elem for elem in self.eulers], sep ='; ')
@@ -420,8 +434,8 @@ class RemoteUdpDataServer(asyncio.Protocol):
                 
                 self.transport.sendto(telemetry_data, self.remoteAddres)
             else:
-                #self.manTelemetryObtained = True
-                if not (self.manTelemetryObtained  and (self.controlType == ControlType.STM_CTRL)):
+                # self.manTelemetryObtained = True
+                if not (self.manTelemetryObtained):
                     # ERRORFLAGS, roll, pitch, yaw, depth, batVoltage, batCharge, batCurrent, rollSP, pitchSP
                     # mot1PhaseA, mot1PhaseB, mot1PhaseC, mot2PhaseA, mot2PhaseB, mot2PhaseC, mot3PhaseA, mot3PhaseB, mot3PhaseC, 
                     # mot4PhaseA, mot4PhaseB, mot4PhaseC, mot5PhaseA, mot5PhaseB, mot5PhaseC, mot6PhaseA, mot6PhaseB, mot6PhaseC
@@ -465,9 +479,9 @@ class RemoteUdpDataServer(asyncio.Protocol):
                                                 self.thrustersPhaseCurrents[3][0], self.thrustersPhaseCurrents[3][1], self.thrustersPhaseCurrents[3][2],
                                                 self.thrustersPhaseCurrents[4][0], self.thrustersPhaseCurrents[4][1], self.thrustersPhaseCurrents[4][2],
                                                 self.thrustersPhaseCurrents[5][0], self.thrustersPhaseCurrents[5][1], self.thrustersPhaseCurrents[5][2],
-                                                self.manipulator.getAxisTelemetryAngle(0),
-                                                self.manipulator.getAxisTelemetryAngle(1),
-                                                self.manipulator.getAxisTelemetryAngle(2),
+                                                self.manipulator.getAxisTelemetryAngle(0)/to_rad,
+                                                self.manipulator.getAxisTelemetryAngle(1)/to_rad,
+                                                self.manipulator.getAxisTelemetryAngle(2)/to_rad,
                                                 manCurrents[0][0], manCurrents[0][1],
                                                 manCurrents[1][0], manCurrents[1][1],
                                                 manCurrents[2][0], manCurrents[2][1],

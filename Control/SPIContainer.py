@@ -2,6 +2,7 @@ import struct
 import numpy as np
 from enum import IntEnum
 from MultiaxisManipulator import GripState
+import copy
 
 # TX_BUFFER: [ MAGIC_START | MOT_SERVO | MAN_Q | ... | MAGIC_END ]
 # TX bytes: [MAGIC_START (1x1)(1) | FLAGS (8x1)(8) | LIGHT (2x4)(8) | MOTORS (6x4)(24) | CAM_ANGLE (1x4)(4) | ... | MAGIC_END (1x1)(1) ]
@@ -18,12 +19,21 @@ class RxBufferOffsets(IntEnum):
     CUR_LIGHT1 = 61
     CUR_LIGHT2 = 65
     VOLTS24 = 69
-    MOTS_PHASE_A_CURRENTS = 73
-    MOTS_PHASE_B_CURRENTS = 97
-    MOTS_PHASE_C_CURRENTS = 121
-    MAN_VOLTAGES = 145
-    MAN_PHASES = 157
-    MAN_ANGLES = 181
+    MOT1_CURRENTS = 73
+    MOT2_CURRENTS = 85
+    MOT3_CURRENTS = 97
+    MOT4_CURRENTS = 109
+    MOT5_CURRENTS = 121
+    MOT6_CURRENTS = 133
+    MAN1_VOLTAGE = 145
+    MAN1_PHASES = 149
+    MAN1_ANGLE = 157
+    MAN2_VOLTAGE = 161
+    MAN2_PHASES = 165
+    MAN2_ANGLE = 173
+    MAN3_VOLTAGE = 177
+    MAN3_PHASES = 181
+    MAN3_ANGLE = 193
     MAGIC_END = 199
 
 class TxBufferOffsets(IntEnum):
@@ -109,9 +119,9 @@ class SPI_Xfer_Container:
         self.cirrentLight1 = 0
         self.cirrentLight2 = 0
         self.voltage24 = 0
-        self.thrustersPhaseCurrents = [[0.0]*3]*6
+        self.thrustersPhaseCurrents = [[0.0, 0.0, 0.0],[0.0, 0.0, 0.0],[0.0, 0.0, 0.0],[0.0, 0.0, 0.0],[0.0, 0.0, 0.0],[0.0, 0.0, 0.0]]
         self.manVoltages = [0.0]*3
-        self.manPhaseCurrents = [[0.0]*2]*3
+        self.manPhaseCurrents = [[0.0, 0.0],[0.0, 0.0],[0.0, 0.0]]
         self.manAngles = [0.0]*3
 
         self.tx_refresh_flags = np.uint64(0)
@@ -124,6 +134,7 @@ class SPI_Xfer_Container:
         rxPacket = 0
         try:
             rxPacket = struct.unpack_from("=" + formPacket(baseRxPacket), self.rx_buffer)
+            #print(*["%.2f" % elem for elem in rxPacket], sep ='; ')
         except:
             print("SPI RX WRONG PACKET")
             return False
@@ -139,16 +150,19 @@ class SPI_Xfer_Container:
         self.voltage24 = rxPacket[17] if self.rx_refresh_flags & SPI_RX_VOLTS24_FLAG else None
         
         for i in range(6):
-            self.thrustersPhaseCurrents[i][0] = rxPacket[18+i*3+0] if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_A_FLAG(i) else None
-            self.thrustersPhaseCurrents[i][1] = rxPacket[18+i*3+1] if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_B_FLAG(i) else None
-            self.thrustersPhaseCurrents[i][2] = rxPacket[18+i*3+2] if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_C_FLAG(i) else None
-        
+            self.thrustersPhaseCurrents[i][0] = rxPacket[18+i*3] if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_A_FLAG(i) else None
+            self.thrustersPhaseCurrents[i][1] = rxPacket[19+i*3] if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_B_FLAG(i) else None
+            self.thrustersPhaseCurrents[i][2] = rxPacket[20+i*3] if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_C_FLAG(i) else None
+        #     print([rxPacket[18+i*3], rxPacket[19+i*3], rxPacket[20+i*3]])
+        if self.thrustersPhaseCurrents is not None:
+            print(self.thrustersPhaseCurrents)
         for i in range(3):
-            self.manVoltages[i] = rxPacket[36+i] if self.rx_refresh_flags & SPI_RX_MAN_UNITx_VOLTAGE_FLAG(i) else None
-            self.manPhaseCurrents[i][0] = rxPacket[38+i*2+0] if self.rx_refresh_flags & SPI_RX_MAN_UNITx_PHASES_A_B_FLAG(i) else None
-            self.manPhaseCurrents[i][1] = rxPacket[38+i*2+1] if self.rx_refresh_flags & SPI_RX_MAN_UNITx_PHASES_A_B_FLAG(i) else None
-            self.manAngles[i] = rxPacket[50+i] if self.rx_refresh_flags & SPI_RX_MAN_UNITx_ANGLE_FLAG(i) else None 
-        
+            self.manVoltages[i] = rxPacket[36+i*4+2] if self.rx_refresh_flags & SPI_RX_MAN_UNITx_VOLTAGE_FLAG(i) else None
+            self.manPhaseCurrents[i][0] = copy.deepcopy(rxPacket[36+i*4+0]) if self.rx_refresh_flags & SPI_RX_MAN_UNITx_PHASES_A_B_FLAG(i) else None
+            self.manPhaseCurrents[i][1] = copy.deepcopy(rxPacket[36+i*4+1]) if self.rx_refresh_flags & SPI_RX_MAN_UNITx_PHASES_A_B_FLAG(i) else None
+            # print([rxPacket[36+i*4+0] ,rxPacket[36+i*4+1]])
+            self.manAngles[i] = rxPacket[36+i*4+3] if self.rx_refresh_flags & SPI_RX_MAN_UNITx_ANGLE_FLAG(i) else None 
+        # print(self.manPhaseCurrents)
         return True
 
     def _fill_tx_buffer(self):
@@ -182,8 +196,8 @@ class SPI_Xfer_Container:
 
     def transfer(self):
         self._fill_tx_buffer()
-        received = struct.unpack_from("QffffffffffffB", self.tx_buffer,1)
-        print(*["%.2f" % elem for elem in received], sep ='; ')
+        # received = struct.unpack_from("QffffffffffffB", self.tx_buffer,1)
+        # print(*["%.2f" % elem for elem in received], sep ='; ')
         count, self.rx_buffer = self.pi.spi_xfer(self.spi_handle, self.tx_buffer)
         self.tx_refresh_flags = np.uint64(0)
         return self._parse_rx_buffer()

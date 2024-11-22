@@ -61,7 +61,7 @@ controlSystem = ControlSystem()
 controlSystem.setThrustersCalibrationValues(thrustersDirCorr, thrustersOrder, trustersXValues, 2)
 
 #init timer parameters
-timerInterval = 1/300 #300 Hz timer interval
+timerInterval = 1/200 #300 Hz timer interval
 
 #init timer
 timer = timer = AsyncTimer(timerInterval, loop)

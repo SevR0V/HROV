@@ -65,7 +65,7 @@ class MultiaxisManipulator:
         self.axes = [ManipAxis(),ManipAxis(),ManipAxis()]
         self.grip = ManipGrip()
         self.numAxes = numAxes
-        self.updateControlFlags = [False]*(numAxes+1)
+        self.updateControlFlags = [False, False, False, False]
         # self.updateTelemetryFlags = [[False, False]]*numAxes
 
     def setControlFlags(self, flags):
