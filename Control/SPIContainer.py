@@ -154,8 +154,8 @@ class SPI_Xfer_Container:
             self.thrustersPhaseCurrents[i][1] = rxPacket[19+i*3] if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_B_FLAG(i) else None
             self.thrustersPhaseCurrents[i][2] = rxPacket[20+i*3] if self.rx_refresh_flags & SPI_RX_MOTx_PHASE_C_FLAG(i) else None
         #     print([rxPacket[18+i*3], rxPacket[19+i*3], rxPacket[20+i*3]])
-        if self.thrustersPhaseCurrents is not None:
-            print(self.thrustersPhaseCurrents)
+        #if self.thrustersPhaseCurrents is not None:
+            #print(self.thrustersPhaseCurrents)
         for i in range(3):
             self.manVoltages[i] = rxPacket[36+i*4+2] if self.rx_refresh_flags & SPI_RX_MAN_UNITx_VOLTAGE_FLAG(i) else None
             self.manPhaseCurrents[i][0] = copy.deepcopy(rxPacket[36+i*4+0]) if self.rx_refresh_flags & SPI_RX_MAN_UNITx_PHASES_A_B_FLAG(i) else None

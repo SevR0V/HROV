@@ -29,7 +29,7 @@ class AsyndHiwonderReader:
         return self.IMUData
     
     def getIMUAngles(self):
-        return self.angles
+        return [self.angles[1],self.angles[0],self.angles[2] ]
 
     def start(self) -> None:
         if not self._running:

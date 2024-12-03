@@ -12,20 +12,23 @@ import serial_asyncio
 from thruster import Thrusters
 from ligths import Lights
 from servo import Servo
+from async_hiwonder_reader import AsyndHiwonderReader
 from MultiaxisManipulator import MultiaxisManipulator
 
 #select IMU
 # IMUType.NAVX
 # IMUType.POLOLU
 # IMUType.HIWONDER
-imuType = IMUType.POLOLU
+imuType = IMUType.HIWONDER
 
 #select contol type
 # ControlType.DIRECT_CTRL
 # ControlType.STM_CTRL
 controlType = ControlType.STM_CTRL
 
-if controlType == ControlType.DIRECT_CTRL:
+if controlType == ControlType.DIRECT_CTRL and imuType == IMUType.POLOLU:
+    print("Wrong IMU Type")
+    exit()
     imuType = IMUType.NAVX
 
 pi = pigpio.pi()
@@ -37,24 +40,21 @@ lights = None
 thrusters = None
 cameraServo = None
 udp_server = None
+hiwonderIMU = None
+hiwonderTimer = None
+hiwonderReader = None
+manipulator = MultiaxisManipulator(3)
 
 #init thrusters parameters
-# thrustersOrder = [ThrustersNames.H_FORW_TOP, 
-#                   ThrustersNames.H_FORW_BOT,
-#                   ThrustersNames.H_SIDE_FRONT, 
-#                   ThrustersNames.H_SIDE_REAR,
-#                   ThrustersNames.V_RIGHT,
-#                   ThrustersNames.V_LEFT]
-thrustersOrder = [ThrustersNames.H_FORW_TOP,
+thrustersOrder = [ThrustersNames.H_FORW_BOT,
+                  ThrustersNames.H_FORW_TOP, 
                   ThrustersNames.V_RIGHT, 
-                  ThrustersNames.H_FORW_BOT, 
+                  ThrustersNames.V_LEFT,
                   ThrustersNames.H_SIDE_REAR,
-                  ThrustersNames.H_SIDE_FRONT,
-                  ThrustersNames.V_LEFT]
-thrustersDirCorr = [1, -1, -1, 1, 1, 1]
+                  ThrustersNames.H_SIDE_FRONT]
+#thrustersDirCorr = [1, -1, 1, 1, -1, 1]
+thrustersDirCorr = [-1, 1, -1, 1, 1, 1]
 trustersXValues = [-100, 100]
-
-manipulator = MultiaxisManipulator(3)
 
 #init control system
 controlSystem = ControlSystem()
@@ -64,11 +64,14 @@ controlSystem.setThrustersCalibrationValues(thrustersDirCorr, thrustersOrder, tr
 timerInterval = 1/200 #300 Hz timer interval
 
 #init timer
-timer = timer = AsyncTimer(timerInterval, loop)
+timer = AsyncTimer(timerInterval, loop)
 
 if imuType == IMUType.NAVX:
     #init NavX
     navx = Navx()
+
+if imuType == IMUType.HIWONDER:
+    hiwonderReader = AsyndHiwonderReader(1/200, loop,'/dev/ttyUSB0', 38400)
 
 if controlType == ControlType.STM_CTRL:
     #init SPI parameters
@@ -78,20 +81,23 @@ if controlType == ControlType.STM_CTRL:
     bridge = SPI_Xfer_Container(pi, SPIChannel, SPISpeed, SPIFlags)
 
     #init main server
-    udp_server = RemoteUdpDataServer(controlSystem, timer, imuType, controlType, manipulator, bridge, navx)
+    udp_server = RemoteUdpDataServer(controlSystem, timer, imuType, controlType, manipulator, bridge, navx, hiwonderReader= hiwonderReader)
 
 if controlType == ControlType.DIRECT_CTRL:
     #init thrusters
     thrustersPins = [0] * 6
 
-    thrustersPins[thrustersOrder.index(ThrustersNames.H_FORW_TOP)]    = 10
-    thrustersPins[thrustersOrder.index(ThrustersNames.H_FORW_BOT)]    = 9
-    thrustersPins[thrustersOrder.index(ThrustersNames.H_SIDE_FRONT)]  = 17
-    thrustersPins[thrustersOrder.index(ThrustersNames.H_SIDE_REAR)]   = 22
-    thrustersPins[thrustersOrder.index(ThrustersNames.V_RIGHT)]       = 27
-    thrustersPins[thrustersOrder.index(ThrustersNames.V_LEFT)]        = 11
+    thrustersPins[thrustersOrder.index(ThrustersNames.H_FORW_TOP)]     = 22
+    thrustersPins[thrustersOrder.index(ThrustersNames.V_RIGHT)]    = 9
+    thrustersPins[thrustersOrder.index(ThrustersNames.H_FORW_BOT)]           = 27
+    thrustersPins[thrustersOrder.index(ThrustersNames.H_SIDE_REAR)]     = 10
+    thrustersPins[thrustersOrder.index(ThrustersNames.H_SIDE_FRONT)]    = 11
+    thrustersPins[thrustersOrder.index(ThrustersNames.V_LEFT)]           = 17
 
-    thrusters = Thrusters(pi, thrustersPins, [16], [[0, 0],[0, 0],[0, 0],[0, 0],[0, 0],[0, 0]], [[0, 0],[0, 0],[0, 0],[0, 0],[0, 0],[0, 0]])
+    thrusters = Thrusters(pi, thrustersPins, [16], 
+                          [[20, 20],[20, 20],[20, 20],[20, 20],[20, 20],[20, 20]],
+                          #[[0, 0],[0, 0],[0, 0],[0, 0],[0, 0],[0, 0]],
+                          [[0, 0],[0, 0],[0, 0],[0, 0],[0, 0],[0, 0]])
 
     #init servos
     cameraServo = Servo(pi, 5, [0, 90])
@@ -100,7 +106,11 @@ if controlType == ControlType.DIRECT_CTRL:
     lights = Lights(pi, [19, 26])
 
     #init main server
-    udp_server = RemoteUdpDataServer(controlSystem, timer, imuType, controlType, manipulator, bridge, navx, thrusters, lights, cameraServo)
+    if imuType == IMUType.NAVX:
+        udp_server = RemoteUdpDataServer(controlSystem, timer, imuType, controlType, manipulator, bridge, navx, thrusters, lights, cameraServo)
+    if imuType == IMUType.HIWONDER:
+        udp_server = RemoteUdpDataServer(controlSystem, timer, imuType, controlType, manipulator, bridge, navx, thrusters, 
+                                         lights, cameraServo, hiwonderReader)
 
 #create tasks
 serial_task = None
@@ -124,3 +134,5 @@ except KeyboardInterrupt:
     loop.close()
     pi.stop()
     print("Shutdown")
+except Exception as ex:
+    print(ex)
